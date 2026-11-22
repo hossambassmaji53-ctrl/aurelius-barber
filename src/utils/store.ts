@@ -395,3 +395,661 @@ export function canUserUseRankFrame(
   if (!preset.requiredRole) return false;
   return hasRole(user, preset.requiredRole);
 }
+export function getActiveNameColor(
+  user?: Pick<UserProfile, 'nameColor' | 'nameColorExpiresAt' | 'role' | 'roles'> | null,
+  nowMs = Date.now()
+): NameColorKey | null {
+  if (!user?.nameColor) return null;
+  if (!(user.nameColor in NAME_COLOR_PRESETS)) return null;
+  if (isFounderUser(user)) return user.nameColor as NameColorKey;
+  if (!user.nameColorExpiresAt) return user.nameColor as NameColorKey;
+  const exp = tsToMillis(user.nameColorExpiresAt);
+  if (!exp || exp > nowMs) return user.nameColor as NameColorKey;
+  return null;
+}
+
+export function getActiveAvatarFrame(
+  user?: Pick<UserProfile, 'avatarFrame' | 'avatarFrameExpiresAt' | 'role' | 'roles'> | null,
+  nowMs = Date.now()
+): AvatarFrameKey | null {
+  if (!user?.avatarFrame) return null;
+  if (!(user.avatarFrame in AVATAR_FRAME_PRESETS)) return null;
+  const key = user.avatarFrame as AvatarFrameKey;
+  const preset = AVATAR_FRAME_PRESETS[key];
+  if (preset.category === 'founder' && !isFounderUser(user)) return null;
+  if (preset.category === 'rank' && preset.requiredRole && !isFounderUser(user) && !hasRole(user, preset.requiredRole)) {
+    return null;
+  }
+  if (isFounderUser(user)) return key;
+  if (!user.avatarFrameExpiresAt) return key;
+  const exp = tsToMillis(user.avatarFrameExpiresAt);
+  if (!exp || exp > nowMs) return key;
+  return null;
+}
+
+export function getActiveChatTitle(
+  user?: Pick<UserProfile, 'chatTitle' | 'chatTitleExpiresAt' | 'role' | 'roles'> | null,
+  nowMs = Date.now()
+): ChatTitleKey | null {
+  if (!user?.chatTitle) return null;
+  if (!(user.chatTitle in CHAT_TITLE_PRESETS)) return null;
+  if (isFounderUser(user)) return user.chatTitle as ChatTitleKey;
+  if (!user.chatTitleExpiresAt) return user.chatTitle as ChatTitleKey;
+  const exp = tsToMillis(user.chatTitleExpiresAt);
+  if (!exp || exp > nowMs) return user.chatTitle as ChatTitleKey;
+  return null;
+}
+
+export function getActiveCreditPass(
+  user?: Pick<UserProfile, 'creditPassTier' | 'creditPassExpiresAt' | 'role' | 'roles'> | null,
+  nowMs = Date.now()
+): string | null {
+  if (!user?.creditPassTier) return null;
+  if (isFounderUser(user)) return null;
+  if (!user.creditPassExpiresAt) return user.creditPassTier;
+  const exp = tsToMillis(user.creditPassExpiresAt);
+  if (!exp || exp > nowMs) return user.creditPassTier;
+  return null;
+}
+
+export function hasAnyActiveCreditRental(
+  user?: Pick<
+    UserProfile,
+    | 'role'
+    | 'roles'
+    | 'creditPassTier'
+    | 'creditPassExpiresAt'
+    | 'isSpecialId'
+    | 'specialIdExpiresAt'
+    | 'specialIdGrantedBy'
+    | 'nameColor'
+    | 'nameColorExpiresAt'
+    | 'avatarFrame'
+    | 'avatarFrameExpiresAt'
+    | 'chatTitle'
+    | 'chatTitleExpiresAt'
+  > | null,
+  nowMs = Date.now()
+): boolean {
+  if (!user || isFounderUser(user)) return false;
+  if (getActiveCreditPass(user, nowMs)) return true;
+  if (getActiveNameColor(user, nowMs)) return true;
+  if (getActiveChatTitle(user, nowMs)) return true;
+  const frameKey = getActiveAvatarFrame(user, nowMs);
+  if (frameKey && AVATAR_FRAME_PRESETS[frameKey]?.category === 'store') return true;
+  if (user.isSpecialId && (user.specialIdGrantedBy === 'store' || Boolean(user.specialIdExpiresAt))) {
+    if (!user.specialIdExpiresAt) return true;
+    const exp = tsToMillis(user.specialIdExpiresAt);
+    if (!exp || exp > nowMs) return true;
+  }
+  return false;
+}
+
+export function formatRemainingDuration(expiresAt: any, nowMs = Date.now()): string {
+  if (!expiresAt) return 'دائم';
+  const exp = tsToMillis(expiresAt);
+  if (!exp) return 'دائم';
+  const diff = exp - nowMs;
+  if (diff <= 0) return 'منتهي';
+  const hours = Math.ceil(diff / (60 * 60 * 1000));
+  if (hours < 24) return `باقي ${hours} ساعة`;
+  const days = Math.ceil(hours / 24);
+  return `باقي ${days} يوم`;
+}
+
+export function isIdReservedForFounder(
+  candidateId: string,
+  config?: StoreConfig | null
+): boolean {
+  const normalized = candidateId.trim().toLowerCase();
+  const resolved = resolveStoreConfig(config);
+  if (resolved.reservedSpecialIds.map((id) => id.toLowerCase()).includes(normalized)) {
+    return true;
+  }
+  // Short 1-2 character/digit ultra-rare IDs stay reserved for Founder assignment
+  if (normalized.length <= 2) return true;
+  return false;
+}
+
+export async function claimDailyLoginReward(
+  user: UserProfile,
+  config?: StoreConfig | null
+): Promise<{ claimed: boolean; amount: number }> {
+  if (user.isBanned) return { claimed: false, amount: 0 };
+  const today = getTodayDateKey();
+  if (user.lastDailyClaimDate === today) {
+    return { claimed: false, amount: 0 };
+  }
+  const resolved = resolveStoreConfig(config);
+  const reward = Math.max(
+    0,
+    Math.min(100, Math.floor(resolved.dailyRewardCoins ?? 25))
+  );
+  if (reward <= 0) return { claimed: false, amount: 0 };
+
+  const userRef = doc(db, 'users', user.uid);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists()) return { claimed: false, amount: 0 };
+    const serverUser = snap.data() as UserProfile;
+    if (serverUser.isBanned || serverUser.lastDailyClaimDate === today) {
+      return { claimed: false, amount: 0 };
+    }
+    const serverPoints = Math.max(0, Math.floor(serverUser.points || 0));
+    const nextPoints = Math.min(1000000, serverPoints + reward);
+    tx.update(userRef, {
+      points: nextPoints,
+      lastDailyClaimDate: today,
+      updatedAt: serverTimestamp(),
+    });
+    return { claimed: true, amount: reward };
+  });
+}
+
+export async function equipFreeAvatarFrame(params: {
+  user: UserProfile;
+  isFounder: boolean;
+  frameKey: AvatarFrameKey | null;
+}): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const { user, isFounder, frameKey } = params;
+  if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+    return { ok: false, error: 'تعذر التحقق من هوية الحساب.' };
+  }
+
+  const effectiveFounder =
+    Boolean(isFounder) && isSuperAdminEmail(auth.currentUser.email);
+
+  if (frameKey === null) {
+    await updateDoc(doc(db, 'users', user.uid), {
+      avatarFrame: '',
+      avatarFrameExpiresAt: null,
+      updatedAt: serverTimestamp(),
+    });
+    return { ok: true, message: 'تمت إزالة الإطار من صورتك بنجاح.' };
+  }
+
+  const preset = AVATAR_FRAME_PRESETS[frameKey];
+  if (!preset) {
+    return { ok: false, error: 'الإطار المختار غير صالح.' };
+  }
+
+  if (preset.category === 'store' && !effectiveFounder) {
+    return { ok: false, error: 'إطارات المتجر تتطلب الشراء بالكريدت.' };
+  }
+
+  if (!canUserUseRankFrame(user, frameKey, effectiveFounder)) {
+    return {
+      ok: false,
+      error: `هذا الإطار مخصص فقط لحاملي الرتبة المطلوبة (${preset.labelAr}).`,
+    };
+  }
+
+  await updateDoc(doc(db, 'users', user.uid), {
+    avatarFrame: frameKey,
+    avatarFrameExpiresAt: null,
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    ok: true,
+    message: `تم تفعيل ${preset.labelAr} مجاناً على صورتك.`,
+  };
+}
+export async function purchaseStoreFeature(params: {
+  user: UserProfile;
+  isFounder: boolean;
+  config: StoreConfig;
+  feature: StoreFeatureKey;
+  allUsers: UserProfile[];
+  customIdValue?: string;
+  nameColorKey?: NameColorKey;
+  avatarFrameKey?: AvatarFrameKey;
+  chatTitleKey?: ChatTitleKey;
+}): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const {
+    user,
+    isFounder,
+    config,
+    feature,
+    allUsers,
+    customIdValue,
+    nameColorKey,
+    avatarFrameKey,
+    chatTitleKey,
+  } = params;
+
+  if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+    return { ok: false, error: 'تعذر التحقق من هوية الحساب.' };
+  }
+
+  const effectiveFounder =
+    Boolean(isFounder) && isSuperAdminEmail(auth.currentUser.email);
+
+  const resolved = resolveStoreConfig(config);
+  const itemCfg = resolved.items[feature] || DEFAULT_STORE_CONFIG.items[feature]!;
+
+  if (!effectiveFounder && !itemCfg.enabled) {
+    return { ok: false, error: 'هذه الميزة غير متاحة حالياً في المتجر.' };
+  }
+
+  const basePrice = effectiveFounder ? 0 : Math.max(0, Math.floor(itemCfg.price));
+  const durationDays = Math.max(1, Math.min(365, Math.floor(itemCfg.durationDays || 7)));
+  const expiresAtTs = effectiveFounder
+    ? null
+    : Timestamp.fromMillis(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+  const userRef = doc(db, 'users', user.uid);
+
+  if (feature === 'special_id') {
+    const cleanId = sanitizeHandleInput(customIdValue);
+    if (!isValidUsername(cleanId)) {
+      return { ok: false, error: 'صيغة الآيدي غير صالحة (أرقام أو أحرف إنجليزية صغيرة و _ فقط).' };
+    }
+    if (!effectiveFounder && isIdReservedForFounder(cleanId, resolved)) {
+      return {
+        ok: false,
+        error: 'هذا الرقم/الآيدي محجوز للإدارة أو المؤسس ولا يمكن شراؤه من المتجر.',
+      };
+    }
+    const conflict = allUsers.find(
+      (u) => u.uid !== user.uid && getUserHandle(u).toLowerCase() === cleanId
+    );
+    if (conflict) {
+      return { ok: false, error: 'هذا الآيدي مستخدم بالفعل من عضو آخر.' };
+    }
+
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists()) return { ok: false, error: 'تعذر العثور على الحساب.' };
+      const serverUser = snap.data() as UserProfile;
+      const serverCredits = Math.max(0, Math.floor(serverUser.points || 0));
+      if (!effectiveFounder && serverCredits < basePrice) {
+        return {
+          ok: false,
+          error: `رصيدك الحالي (${serverCredits} كريدت) غير كافٍ. المطلوب ${basePrice} كريدت.`,
+        };
+      }
+      const nextPoints = effectiveFounder ? serverCredits : serverCredits - basePrice;
+      const baseHandle = isValidUsername(serverUser.baseUsername)
+        ? serverUser.baseUsername!
+        : !serverUser.isSpecialId
+          ? getUserHandle(serverUser)
+          : serverUser.baseUsername || getUserHandle(serverUser);
+
+      tx.update(userRef, {
+        ...(effectiveFounder ? {} : { points: nextPoints }),
+        baseUsername: baseHandle,
+        username: cleanId,
+        isSpecialId: true,
+        specialIdLabel: effectiveFounder ? 'آيدي المؤسس المميز' : 'آيدي مميز (متجر)',
+        specialIdExpiresAt: expiresAtTs,
+        specialIdGrantedBy: effectiveFounder ? 'admin' : 'store',
+        updatedAt: serverTimestamp(),
+      });
+
+      return {
+        ok: true,
+        message: effectiveFounder
+          ? `تم تفعيل الآيدي @${cleanId} بشكل دائم ومجاني للمؤسس.`
+          : `تم تفعيل الآيدي المميز @${cleanId} لمدة ${durationDays} يوم.`,
+      };
+    });
+  }
+
+  if (feature === 'name_color') {
+    if (!nameColorKey || !(nameColorKey in NAME_COLOR_PRESETS)) {
+      return { ok: false, error: 'يرجى اختيار لون اسم صالح.' };
+    }
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists()) return { ok: false, error: 'تعذر العثور على الحساب.' };
+      const serverUser = snap.data() as UserProfile;
+      const serverCredits = Math.max(0, Math.floor(serverUser.points || 0));
+      if (!effectiveFounder && serverCredits < basePrice) {
+        return {
+          ok: false,
+          error: `رصيدك الحالي (${serverCredits} كريدت) غير كافٍ. المطلوب ${basePrice} كريدت.`,
+        };
+      }
+      const nextPoints = effectiveFounder ? serverCredits : serverCredits - basePrice;
+      tx.update(userRef, {
+        ...(effectiveFounder ? {} : { points: nextPoints }),
+        nameColor: nameColorKey,
+        nameColorExpiresAt: expiresAtTs,
+        updatedAt: serverTimestamp(),
+      });
+      return {
+        ok: true,
+        message: effectiveFounder
+          ? `تم تفعيل لون الاسم (${NAME_COLOR_PRESETS[nameColorKey].labelAr}) بشكل دائم.`
+          : `تم تفعيل لون الاسم (${NAME_COLOR_PRESETS[nameColorKey].labelAr}) لمدة ${durationDays} يوم.`,
+      };
+    });
+  }
+
+  if (feature === 'avatar_frame') {
+    if (!avatarFrameKey || !(avatarFrameKey in AVATAR_FRAME_PRESETS)) {
+      return { ok: false, error: 'يرجى اختيار إطار صورة صالح.' };
+    }
+    const preset = AVATAR_FRAME_PRESETS[avatarFrameKey];
+    if (preset.category !== 'store') {
+      return equipFreeAvatarFrame({
+        user,
+        isFounder: effectiveFounder,
+        frameKey: avatarFrameKey,
+      });
+    }
+    const framePrice = effectiveFounder
+      ? 0
+      : getStoreAvatarFramePrice(avatarFrameKey as StoreAvatarFrameKey, resolved);
+
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists()) return { ok: false, error: 'تعذر العثور على الحساب.' };
+      const serverUser = snap.data() as UserProfile;
+      const serverCredits = Math.max(0, Math.floor(serverUser.points || 0));
+      if (!effectiveFounder && serverCredits < framePrice) {
+        return {
+          ok: false,
+          error: `رصيدك الحالي (${serverCredits} كريدت) غير كافٍ. المطلوب ${framePrice} كريدت.`,
+        };
+      }
+      const nextPoints = effectiveFounder ? serverCredits : serverCredits - framePrice;
+      tx.update(userRef, {
+        ...(effectiveFounder ? {} : { points: nextPoints }),
+        avatarFrame: avatarFrameKey,
+        avatarFrameExpiresAt: expiresAtTs,
+        updatedAt: serverTimestamp(),
+      });
+      return {
+        ok: true,
+        message: effectiveFounder
+          ? `تم تفعيل (${preset.labelAr}) بشكل دائم.`
+          : `تم تفعيل (${preset.labelAr}) لمدة ${durationDays} يوم.`,
+      };
+    });
+  }
+
+  if (feature === 'chat_title') {
+    if (!chatTitleKey || !(chatTitleKey in CHAT_TITLE_PRESETS)) {
+      return { ok: false, error: 'يرجى اختيار لقب دردشة صالح.' };
+    }
+    const preset = CHAT_TITLE_PRESETS[chatTitleKey];
+    if (preset.founderOnly && !effectiveFounder) {
+      return { ok: false, error: 'هذا اللقب السيادي مخصص للمؤسس فقط.' };
+    }
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists()) return { ok: false, error: 'تعذر العثور على الحساب.' };
+      const serverUser = snap.data() as UserProfile;
+      const serverCredits = Math.max(0, Math.floor(serverUser.points || 0));
+      if (!effectiveFounder && serverCredits < basePrice) {
+        return {
+          ok: false,
+          error: `رصيدك الحالي (${serverCredits} كريدت) غير كافٍ. المطلوب ${basePrice} كريدت.`,
+        };
+      }
+      const nextPoints = effectiveFounder ? serverCredits : serverCredits - basePrice;
+      tx.update(userRef, {
+        ...(effectiveFounder ? {} : { points: nextPoints }),
+        chatTitle: chatTitleKey,
+        chatTitleExpiresAt: expiresAtTs,
+        updatedAt: serverTimestamp(),
+      });
+      return {
+        ok: true,
+        message: effectiveFounder
+          ? `تم تفعيل لقب (${preset.labelAr}) بشكل دائم للمؤسس.`
+          : `تم تفعيل لقب (${preset.labelAr}) في الدردشة لمدة ${durationDays} يوم.`,
+      };
+    });
+  }
+
+  if (feature === 'credit_pass') {
+    if (effectiveFounder) {
+      return {
+        ok: true,
+        message: 'بطاقة المؤسس الملكية مفعّلة لديك بشكل دائم ومجاني ولا تحتاج إلى بطاقة متجر مؤقتة.',
+      };
+    }
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists()) return { ok: false, error: 'تعذر العثور على الحساب.' };
+      const serverUser = snap.data() as UserProfile;
+      const serverCredits = Math.max(0, Math.floor(serverUser.points || 0));
+      if (serverCredits < basePrice) {
+        return {
+          ok: false,
+          error: `رصيدك الحالي (${serverCredits} كريدت) غير كافٍ. المطلوب ${basePrice} كريدت.`,
+        };
+      }
+      const nextPoints = serverCredits - basePrice;
+      tx.update(userRef, {
+        points: nextPoints,
+        creditPassTier: 'aurelius_credit_pass',
+        creditPassExpiresAt: expiresAtTs,
+        updatedAt: serverTimestamp(),
+      });
+      return {
+        ok: true,
+        message: `تم تفعيل بطاقة المتجر المؤقتة (بالكريدت) في ملفك لمدة ${durationDays} يوم.`,
+      };
+    });
+  }
+
+  return { ok: false, error: 'خيار غير معروف.' };
+}
+
+export async function adminAdjustMemberCredits(params: {
+  actor: UserProfile;
+  target: UserProfile;
+  mode: 'add' | 'deduct' | 'set';
+  amount: number;
+  reason?: string;
+}): Promise<number> {
+  const { actor, target, mode, amount, reason } = params;
+  const isFounderAuth =
+    isSuperAdminEmail(auth.currentUser?.email) && auth.currentUser?.uid === actor.uid;
+  assertFounderActor(actor, isFounderAuth);
+  const cleanAmount = Math.max(0, Math.min(1000000, Math.floor(amount)));
+  const targetRef = doc(db, 'users', target.uid);
+
+  const next = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(targetRef);
+    const serverPoints = snap.exists()
+      ? Math.max(0, Math.floor(((snap.data() as UserProfile).points) || 0))
+      : Math.max(0, Math.floor(target.points || 0));
+    const computed =
+      mode === 'set'
+        ? Math.min(1000000, cleanAmount)
+        : mode === 'add'
+          ? Math.min(1000000, serverPoints + cleanAmount)
+          : Math.max(0, serverPoints - cleanAmount);
+
+    tx.update(targetRef, {
+      points: computed,
+      updatedAt: serverTimestamp(),
+    });
+    return computed;
+  });
+
+  const actionLabel =
+    mode === 'set'
+      ? `تعيين رصيد الكريدت إلى ${next}`
+      : mode === 'add'
+        ? `منح +${cleanAmount} كريدت`
+        : `خصم -${cleanAmount} كريدت`;
+
+  const logId = createSafeId('log');
+  await setDoc(doc(db, 'activityLogs', logId), {
+    id: logId,
+    actorId: actor.uid,
+    actorName: actor.displayName,
+    action: actionLabel,
+    targetUserId: target.uid,
+    targetUserName: target.displayName,
+    reason:
+      sanitizePlainText(reason, 240, { multiline: false }) ||
+      'تعديل إداري لرصيد الكريدت',
+    createdAt: serverTimestamp(),
+  });
+
+  if (target.uid !== actor.uid) {
+    const notifId = createSafeId('ntf');
+    await setDoc(doc(db, 'notifications', notifId), {
+      id: notifId,
+      recipientId: target.uid,
+      senderId: actor.uid,
+      senderName: actor.displayName,
+      type: 'credit_grant',
+      title: 'تحديث رصيد الكريدت الخاص بك',
+      body: `${actionLabel} بواسطة ${actor.displayName}. رصيدك الحالي: ${next} كريدت.`,
+      targetView: 'store',
+      targetId: target.uid,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  return next;
+}
+
+export async function adminUpdateMemberId(params: {
+  actor: UserProfile;
+  target: UserProfile;
+  newHandle: string;
+  isSpecialId: boolean;
+  specialIdLabel?: string;
+  durationDays?: number | null; // null or <=0 = permanent
+}): Promise<void> {
+  const { actor, target, newHandle, isSpecialId, specialIdLabel, durationDays } = params;
+  const isFounderAuth =
+    isSuperAdminEmail(auth.currentUser?.email) && auth.currentUser?.uid === actor.uid;
+  assertFounderActor(actor, isFounderAuth);
+
+  const cleanHandle = sanitizeHandleInput(newHandle);
+  if (!isValidUsername(cleanHandle)) {
+    throw new Error('صيغة المعرّف غير صالحة.');
+  }
+  const cleanSpecialLabel =
+    sanitizePlainText(specialIdLabel, 40, { multiline: false }) || 'آيدي مميز';
+
+  const baseHandle = isValidUsername(target.baseUsername)
+    ? target.baseUsername!
+    : !target.isSpecialId
+      ? getUserHandle(target)
+      : target.baseUsername || getUserHandle(target);
+
+  const expiresAtTs =
+    isSpecialId && durationDays && durationDays > 0
+      ? Timestamp.fromMillis(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+      : null;
+
+  await updateDoc(doc(db, 'users', target.uid), {
+    baseUsername: baseHandle,
+    username: cleanHandle,
+    isSpecialId,
+    specialIdLabel: isSpecialId ? cleanSpecialLabel : '',
+    specialIdExpiresAt: expiresAtTs,
+    specialIdGrantedBy: isSpecialId ? 'admin' : '',
+    updatedAt: serverTimestamp(),
+  });
+
+  const logId = createSafeId('log');
+  await setDoc(doc(db, 'activityLogs', logId), {
+    id: logId,
+    actorId: actor.uid,
+    actorName: actor.displayName,
+    action: isSpecialId
+      ? `تخصيص آيدي مميز (@${cleanHandle})`
+      : `تحديث الآيدي (@${cleanHandle})`,
+    targetUserId: target.uid,
+    targetUserName: target.displayName,
+    reason: isSpecialId
+      ? durationDays && durationDays > 0
+        ? `آيدي مميز مؤقت لمدة ${durationDays} يوم`
+        : 'آيدي مميز دائم بإدارة المؤسس'
+      : 'تعديل إداري للآيدي',
+    createdAt: serverTimestamp(),
+  });
+
+  if (target.uid !== actor.uid) {
+    const notifId = createSafeId('ntf');
+    await setDoc(doc(db, 'notifications', notifId), {
+      id: notifId,
+      recipientId: target.uid,
+      senderId: actor.uid,
+      senderName: actor.displayName,
+      type: 'role_update',
+      title: isSpecialId ? 'تم منحك آيدي مميز' : 'تم تحديث معرف الحساب',
+      body: isSpecialId
+        ? `خصص لك المؤسس الآيدي المميز @${cleanHandle}${durationDays && durationDays > 0 ? ` لمدة ${durationDays} يوم` : ' بشكل دائم'}.`
+        : `تم تحديث معرف حسابك إلى @${cleanHandle}.`,
+      targetView: 'profile',
+      targetId: target.uid,
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+  }
+}
+
+export async function adminGrantMemberPerk(params: {
+  actor: UserProfile;
+  target: UserProfile;
+  perkType: 'name_color' | 'avatar_frame' | 'chat_title';
+  value: string | null; // null revokes
+  durationDays?: number | null; // null = permanent
+}): Promise<void> {
+  const { actor, target, perkType, value, durationDays } = params;
+  const isFounderAuth =
+    isSuperAdminEmail(auth.currentUser?.email) && auth.currentUser?.uid === actor.uid;
+  assertFounderActor(actor, isFounderAuth);
+  const expiresAtTs =
+    value && durationDays && durationDays > 0
+      ? Timestamp.fromMillis(Date.now() + durationDays * 24 * 60 * 60 * 1000)
+      : null;
+
+  if (perkType === 'name_color') {
+    await updateDoc(doc(db, 'users', target.uid), {
+      nameColor: value || '',
+      nameColorExpiresAt: expiresAtTs,
+      updatedAt: serverTimestamp(),
+    });
+  } else if (perkType === 'chat_title') {
+    await updateDoc(doc(db, 'users', target.uid), {
+      chatTitle: value || '',
+      chatTitleExpiresAt: expiresAtTs,
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await updateDoc(doc(db, 'users', target.uid), {
+      avatarFrame: value || '',
+      avatarFrameExpiresAt: expiresAtTs,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  const label =
+    perkType === 'name_color'
+      ? value
+        ? `منح لون اسم (${NAME_COLOR_PRESETS[value as NameColorKey]?.labelAr || value})`
+        : 'سحب لون الاسم المميز'
+      : perkType === 'chat_title'
+        ? value
+          ? `منح لقب دردشة (${CHAT_TITLE_PRESETS[value as ChatTitleKey]?.labelAr || value})`
+          : 'سحب لقب الدردشة'
+        : value
+          ? `منح إطار بروفايل (${AVATAR_FRAME_PRESETS[value as AvatarFrameKey]?.labelAr || value})`
+          : 'سحب إطار البروفايل';
+
+  const logId = createSafeId('log');
+  await setDoc(doc(db, 'activityLogs', logId), {
+    id: logId,
+    actorId: actor.uid,
+    actorName: actor.displayName,
+    action: label,
+    targetUserId: target.uid,
+    targetUserName: target.displayName,
+    reason: durationDays && durationDays > 0 ? `منحة لمدة ${durationDays} يوم` : 'منحة دائمة ومجانية من المؤسس',
+    createdAt: serverTimestamp(),
+  });
+    }
