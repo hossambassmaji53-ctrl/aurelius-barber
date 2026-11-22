@@ -1,0 +1,58 @@
+{
+  "id": "./",
+  "name": "أوريليوس باربر (Aurelius Barber)",
+  "short_name": "أوريليوس",
+  "description": "أوريليوس باربر (Aurelius Barber): منصة متكاملة للحلاقين الموثقين والزبائن — معرض VIP حصري، دردشة عامة وخاصة حية، نظام حجوزات دقيق، وخرائط تفاعلية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "theme_color": "#0B0B0E",
+  "background_color": "#0B0B0E",
+  "categories": ["lifestyle", "beauty", "social"],
+  "icons": [
+    {
+      "src": "./pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "أوريليوس باربر — المعرض الفاخر ومنصة الحلاقين والزبائن"
+    },
+    {
+      "src": "./screenshot-mobile.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "أوريليوس باربر على الجوال — الدردشة الحية والمعرض الحصري"
+    }
+  ]
+}
