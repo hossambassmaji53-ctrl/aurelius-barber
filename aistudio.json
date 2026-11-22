@@ -1,0 +1,6 @@
+{
+  "name": "مقص النخبة | BarberCraft",
+  "description": "منصة متكاملة للحلاقين الموثقين والزبائن: معرض أعمال، دردشة عامة وخاصة حية، نظام حجوزات دقيق، خرائط تفاعلية، وتقييمات.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
