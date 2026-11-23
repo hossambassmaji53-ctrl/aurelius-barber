@@ -1,0 +1,1550 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidRoleId(roleStr) {
+      return roleStr is string && roleStr.size() >= 1 && roleStr.size() <= 64 && roleStr.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedEmail() && request.auth.uid == userId;
+    }
+
+    // Sole Exclusive Founder / Super Admin
+    function isSuperAdmin() {
+      return isVerifiedEmail() && request.auth.token.email == 'hossambassmaji53@gmail.com';
+    }
+
+    function userExists(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function userHasRole(userData, targetRole) {
+      return userData.role == targetRole ||
+        ('roles' in userData && userData.roles is list && targetRole in userData.roles);
+    }
+
+    function hasDynamicRolePerm(userData, permKey) {
+      return exists(/databases/$(database)/documents/roleDefinitions/$(userData.role)) &&
+        'permissions' in get(/databases/$(database)/documents/roleDefinitions/$(userData.role)).data &&
+        get(/databases/$(database)/documents/roleDefinitions/$(userData.role)).data.permissions.get(permKey, false) == true;
+    }
+
+    function isStaffMember() {
+      return isSuperAdmin() || (
+        isVerifiedEmail() &&
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false &&
+        (
+          userHasRole(getUserData(request.auth.uid), 'deputy_director') ||
+          userHasRole(getUserData(request.auth.uid), 'moderator') ||
+          userHasRole(getUserData(request.auth.uid), 'chat_moderator') ||
+          hasDynamicRolePerm(getUserData(request.auth.uid), 'accessStaffRoom')
+        )
+      );
+    }
+
+    function isModeratorOrAdmin() {
+      return isStaffMember();
+    }
+
+    function canBanMembers() {
+      return isSuperAdmin() || (
+        isVerifiedEmail() &&
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false &&
+        (
+          userHasRole(getUserData(request.auth.uid), 'deputy_director') ||
+          userHasRole(getUserData(request.auth.uid), 'moderator') ||
+          hasDynamicRolePerm(getUserData(request.auth.uid), 'banUsers')
+        )
+      );
+    }
+
+    // Gallery Publishing Gate: VIP Barber, Master Barber, dynamic permission, or Founder
+    function isVipBarberOrAdmin() {
+      return isSuperAdmin() || (
+        isVerifiedEmail() &&
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false &&
+        (
+          userHasRole(getUserData(request.auth.uid), 'vip_barber') ||
+          userHasRole(getUserData(request.auth.uid), 'master_barber') ||
+          hasDynamicRolePerm(getUserData(request.auth.uid), 'publishGallery')
+        )
+      );
+    }
+
+    function isNotBanned() {
+      return isSuperAdmin() || (
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false
+      );
+    }
+
+    function isNotMutedOrKicked() {
+      return isSuperAdmin() || (
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false &&
+        getUserData(request.auth.uid).isMuted == false &&
+        getUserData(request.auth.uid).isKicked == false
+      );
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isSafeMediaUrlString(val, maxLen) {
+      return val is string &&
+        val.size() <= maxLen &&
+        (
+          val.matches('^https://[^\\s<>"\']+$') ||
+          val.matches('^data:image/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$') ||
+          val.matches('^\\.?/(src/)?assets/[A-Za-z0-9_./\\-]+$')
+        );
+    }
+
+    function isSafeStoryMediaUrlString(val, maxLen) {
+      return val is string &&
+        val.size() <= maxLen &&
+        (
+          isSafeMediaUrlString(val, maxLen) ||
+          val.matches('^data:video/(mp4|webm|quicktime);base64,[A-Za-z0-9+/=]+$')
+        );
+    }
+
+    function isOptionalSafeMediaUrl(data, field, maxLen) {
+      return !(field in data) || (
+        data[field] is string &&
+        (data[field] == '' || isSafeMediaUrlString(data[field], maxLen))
+      );
+    }
+
+    function isOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] == null || data[field] is timestamp;
+    }
+
+    function isOptionalCountryCode(data) {
+      return !('countryCode' in data) || (data.countryCode is string && data.countryCode.matches('^[A-Z]{2}$'));
+    }
+
+    function isAnyBarberOrAdmin() {
+      return isSuperAdmin() || (
+        isVerifiedEmail() &&
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false &&
+        (
+          userHasRole(getUserData(request.auth.uid), 'vip_barber') ||
+          userHasRole(getUserData(request.auth.uid), 'master_barber') ||
+          userHasRole(getUserData(request.auth.uid), 'barber_verified') ||
+          hasDynamicRolePerm(getUserData(request.auth.uid), 'receiveBookings')
+        )
+      );
+    }
+
+    function canPublishStory() {
+      return isSuperAdmin() || (
+        isVerifiedEmail() &&
+        userExists(request.auth.uid) &&
+        getUserData(request.auth.uid).isBanned == false &&
+        (
+          ('canPostStory' in getUserData(request.auth.uid) && getUserData(request.auth.uid).canPostStory == true) ||
+          hasDynamicRolePerm(getUserData(request.auth.uid), 'publishStories')
+        )
+      );
+    }
+
+    // Store Configuration Helpers (Server-Enforced Pricing & Availability)
+    function hasStoreConfig() {
+      return exists(/databases/$(database)/documents/storeConfig/current);
+    }
+
+    function getStoreConfigData() {
+      return get(/databases/$(database)/documents/storeConfig/current).data;
+    }
+
+    function isStoreItemEnabled(itemKey) {
+      return !hasStoreConfig() ||
+        !('items' in getStoreConfigData()) ||
+        !(itemKey in getStoreConfigData().items) ||
+        getStoreConfigData().items[itemKey].enabled == true;
+    }
+
+    function getStoreItemPrice(itemKey, defaultPrice) {
+      return hasStoreConfig() &&
+        'items' in getStoreConfigData() &&
+        itemKey in getStoreConfigData().items
+        ? getStoreConfigData().items[itemKey].price
+        : defaultPrice;
+    }
+
+    function getStoreItemDurationDays(itemKey) {
+      return hasStoreConfig() &&
+        'items' in getStoreConfigData() &&
+        itemKey in getStoreConfigData().items
+        ? getStoreConfigData().items[itemKey].durationDays
+        : 7;
+    }
+
+    function isReservedHandle(handle) {
+      return handle.size() <= 2 ||
+        (hasStoreConfig() && 'reservedSpecialIds' in getStoreConfigData() && handle in getStoreConfigData().reservedSpecialIds);
+    }
+
+    function getDailyRewardCap() {
+      return hasStoreConfig() && 'dailyRewardCoins' in getStoreConfigData()
+        ? getStoreConfigData().dailyRewardCoins
+        : 25;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'role', 'availability',
+          'isMuted', 'isKicked', 'isBanned', 'isPublicProfile',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'displayName', 'username', 'baseUsername',
+          'isSpecialId', 'specialIdLabel', 'specialIdExpiresAt', 'specialIdGrantedBy',
+          'nameColor', 'nameColorExpiresAt', 'avatarFrame', 'avatarFrameExpiresAt',
+          'chatTitle', 'chatTitleExpiresAt',
+          'creditPassTier', 'creditPassExpiresAt',
+          'lastDailyClaimDate', 'photoURL', 'coverURL', 'bio',
+          'role', 'roles', 'availability', 'liveStatus', 'points', 'completedBookingsCount',
+          'salonName', 'addressLabel', 'location', 'services', 'canPostStory', 'countryCode',
+          'friendRequestPolicy', 'hideOnlineStatus', 'isOnline', 'lastActiveAt',
+          'isMuted', 'muteReason', 'isKicked', 'kickReason',
+          'isBanned', 'banReason', 'isPublicProfile',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.uid == userId &&
+        isValidId(data.uid) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        (!('username' in data) || (data.username is string && data.username.matches('^[a-z0-9_]{1,24}$'))) &&
+        (!('baseUsername' in data) || (data.baseUsername is string && data.baseUsername.matches('^[a-z0-9_]{1,24}$'))) &&
+        (!('isSpecialId' in data) || data.isSpecialId is bool) &&
+        isOptionalString(data, 'specialIdLabel', 40) &&
+        isOptionalTimestamp(data, 'specialIdExpiresAt') &&
+        isOptionalString(data, 'specialIdGrantedBy', 40) &&
+        isOptionalString(data, 'nameColor', 40) &&
+        isOptionalTimestamp(data, 'nameColorExpiresAt') &&
+        isOptionalString(data, 'avatarFrame', 40) &&
+        isOptionalTimestamp(data, 'avatarFrameExpiresAt') &&
+        isOptionalString(data, 'chatTitle', 40) &&
+        isOptionalTimestamp(data, 'chatTitleExpiresAt') &&
+        isOptionalString(data, 'creditPassTier', 40) &&
+        isOptionalTimestamp(data, 'creditPassExpiresAt') &&
+        (!('lastDailyClaimDate' in data) || (data.lastDailyClaimDate is string && data.lastDailyClaimDate.matches('^\\d{4}-\\d{2}-\\d{2}$'))) &&
+        isOptionalSafeMediaUrl(data, 'photoURL', 350000) &&
+        isOptionalSafeMediaUrl(data, 'coverURL', 350000) &&
+        isOptionalString(data, 'bio', 400) &&
+        isValidRoleId(data.role) &&
+        (!('roles' in data) || (
+          data.roles is list &&
+          data.roles.size() >= 1 &&
+          data.roles.size() <= 6 &&
+          isValidRoleId(data.roles[0])
+        )) &&
+        data.availability in ['available', 'busy'] &&
+        (!('liveStatus' in data) || data.liveStatus in ['online', 'cutting', 'offline']) &&
+        (!('points' in data) || (data.points is int && data.points >= 0 && data.points <= 1000000)) &&
+        (!('completedBookingsCount' in data) || (data.completedBookingsCount is int && data.completedBookingsCount >= 0 && data.completedBookingsCount <= 100000)) &&
+        isOptionalString(data, 'salonName', 100) &&
+        isOptionalString(data, 'addressLabel', 160) &&
+        (!('location' in data) || (
+          data.location is map &&
+          data.location.keys().hasAll(['lat', 'lng']) &&
+          data.location.keys().hasOnly(['lat', 'lng']) &&
+          data.location.lat is number && data.location.lat >= -90 && data.location.lat <= 90 &&
+          data.location.lng is number && data.location.lng >= -180 && data.location.lng <= 180
+        )) &&
+        (!('services' in data) || (
+          data.services is list &&
+          data.services.size() <= 20 &&
+          (data.services.size() == 0 || (
+            data.services[0] is map &&
+            data.services[0].keys().hasAll(['id', 'name', 'price', 'durationMinutes'])
+          ))
+        )) &&
+        (!('canPostStory' in data) || data.canPostStory is bool) &&
+        isOptionalCountryCode(data) &&
+        (!('friendRequestPolicy' in data) || data.friendRequestPolicy in ['everyone', 'barbers_only', 'nobody']) &&
+        (!('hideOnlineStatus' in data) || data.hideOnlineStatus is bool) &&
+        (!('isOnline' in data) || data.isOnline is bool) &&
+        (!('lastActiveAt' in data) || data.lastActiveAt is timestamp) &&
+        data.isMuted is bool &&
+        isOptionalString(data, 'muteReason', 240) &&
+data.isKicked is bool &&
+        isOptionalString(data, 'kickReason', 240) &&
+        data.isBanned is bool &&
+        isOptionalString(data, 'banReason', 240) &&
+        data.isPublicProfile == true &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'createdAt', 'updatedAt']) &&
+        data.uid == userId &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 160 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidBlockedUser(data, userId, blockedUid) {
+      return data.keys().hasAll(['id', 'blockerId', 'blockedUserId', 'blockedUserName', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'blockerId', 'blockedUserId', 'blockedUserName', 'blockedUserPhoto', 'reason', 'createdAt']) &&
+        data.id == blockedUid &&
+        data.blockerId == userId &&
+        data.blockedUserId == blockedUid &&
+        isValidId(data.id) &&
+        isValidId(data.blockerId) &&
+        isValidId(data.blockedUserId) &&
+        data.blockerId != data.blockedUserId &&
+        data.blockedUserName is string && data.blockedUserName.size() >= 1 && data.blockedUserName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'blockedUserPhoto', 350000) &&
+        isOptionalString(data, 'reason', 240) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidContentReport(data, reportId) {
+      return data.keys().hasAll([
+          'id', 'reporterId', 'reporterName', 'targetType', 'targetId',
+          'targetOwnerId', 'targetOwnerName', 'category', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'reporterId', 'reporterName', 'targetType', 'targetId',
+          'targetOwnerId', 'targetOwnerName', 'targetPreview', 'category',
+          'reason', 'status', 'reviewedById', 'reviewedByName', 'resolutionNote',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.id == reportId &&
+        isValidId(data.id) &&
+        isValidId(data.reporterId) &&
+        data.reporterName is string && data.reporterName.size() >= 1 && data.reporterName.size() <= 80 &&
+        data.targetType in ['message', 'gallery', 'story', 'profile'] &&
+        isValidId(data.targetId) &&
+        isValidId(data.targetOwnerId) &&
+        data.targetOwnerName is string && data.targetOwnerName.size() >= 1 && data.targetOwnerName.size() <= 80 &&
+        isOptionalString(data, 'targetPreview', 180) &&
+        data.category in ['harassment', 'spam', 'inappropriate', 'impersonation', 'other'] &&
+        isOptionalString(data, 'reason', 400) &&
+        data.status in ['pending', 'reviewed', 'dismissed'] &&
+        isOptionalString(data, 'reviewedById', 128) &&
+        isOptionalString(data, 'reviewedByName', 80) &&
+        isOptionalString(data, 'resolutionNote', 300) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRoleDefinition(data, roleId) {
+      return data.keys().hasAll([
+          'id', 'nameAr', 'shortLabelAr', 'colorKey',
+          'hierarchyOrder', 'permissions', 'createdById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'nameAr', 'shortLabelAr', 'descriptionAr', 'colorKey',
+          'hierarchyOrder', 'isSystem', 'permissions', 'createdById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == roleId &&
+        isValidRoleId(data.id) &&
+        data.nameAr is string && data.nameAr.size() >= 1 && data.nameAr.size() <= 60 &&
+        data.shortLabelAr is string && data.shortLabelAr.size() >= 1 && data.shortLabelAr.size() <= 40 &&
+        isOptionalString(data, 'descriptionAr', 240) &&
+        data.colorKey in ['gold', 'crimson', 'indigo', 'teal', 'silver', 'amber', 'emerald', 'violet', 'slate'] &&
+        data.hierarchyOrder is int && data.hierarchyOrder >= 1 && data.hierarchyOrder <= 100 &&
+        (!('isSystem' in data) || data.isSystem is bool) &&
+        data.permissions is map &&
+        isValidId(data.createdById) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidStoreItemConfig(item) {
+      return item is map &&
+        item.keys().hasAll(['enabled', 'price', 'durationDays']) &&
+        item.keys().hasOnly(['enabled', 'price', 'durationDays', 'labelAr']) &&
+        item.enabled is bool &&
+        item.price is int && item.price >= 0 && item.price <= 100000 &&
+        item.durationDays is int && item.durationDays >= 1 && item.durationDays <= 365 &&
+        isOptionalString(item, 'labelAr', 80);
+    }
+
+    function isValidStoreConfig(data, configId) {
+      return data.keys().hasAll([
+          'id', 'dailyRewardCoins', 'reservedSpecialIds', 'items',
+          'updatedById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'dailyRewardCoins', 'reservedSpecialIds', 'items',
+          'updatedById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == configId &&
+        configId == 'current' &&
+        data.dailyRewardCoins is int && data.dailyRewardCoins >= 0 && data.dailyRewardCoins <= 100 &&
+        data.reservedSpecialIds is list && data.reservedSpecialIds.size() <= 100 &&
+        data.items is map &&
+        data.items.keys().hasAll(['special_id', 'name_color', 'avatar_frame']) &&
+        data.items.keys().hasOnly(['special_id', 'name_color', 'avatar_frame', 'chat_title', 'credit_pass']) &&
+        isValidStoreItemConfig(data.items.special_id) &&
+        isValidStoreItemConfig(data.items.name_color) &&
+        isValidStoreItemConfig(data.items.avatar_frame) &&
+        (!('chat_title' in data.items) || isValidStoreItemConfig(data.items.chat_title)) &&
+        (!('credit_pass' in data.items) || isValidStoreItemConfig(data.items.credit_pass)) &&
+        isValidId(data.updatedById) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidVerificationRequest(data, requestId) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'salonName', 'experience',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'userId', 'userName', 'userPhoto', 'salonName',
+          'countryCode', 'city', 'experience', 'phoneOrSocial', 'status', 'adminNote',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.id == requestId &&
+        isValidId(data.id) &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'userPhoto', 350000) &&
+        data.salonName is string && data.salonName.size() >= 1 && data.salonName.size() <= 100 &&
+        isOptionalCountryCode(data) &&
+        isOptionalString(data, 'city', 80) &&
+        data.experience is string && data.experience.size() >= 1 && data.experience.size() <= 400 &&
+        isOptionalString(data, 'phoneOrSocial', 120) &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        isOptionalString(data, 'adminNote', 300) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGalleryItem(data, itemId) {
+      return data.keys().hasAll([
+          'id', 'barberId', 'barberName', 'title', 'category',
+          'imageUrl', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'barberId', 'barberName', 'barberPhoto', 'title',
+          'description', 'category', 'imageUrl', 'isBeforeAfter',
+          'beforeImageUrl', 'countryCode',
+          'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == itemId &&
+        isValidId(data.id) &&
+        isValidId(data.barberId) &&
+        data.barberName is string && data.barberName.size() >= 1 && data.barberName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'barberPhoto', 350000) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+        isOptionalString(data, 'description', 500) &&
+        data.category in ['fade', 'beard', 'classic', 'styling', 'vip'] &&
+        isSafeMediaUrlString(data.imageUrl, 400000) &&
+        data.imageUrl.size() >= 1 &&
+        (!('isBeforeAfter' in data) || data.isBeforeAfter is bool) &&
+        isOptionalSafeMediaUrl(data, 'beforeImageUrl', 400000) &&
+        isOptionalCountryCode(data) &&
+        data.visibility == 'public' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLikeRecord(data, likeId) {
+      return data.keys().hasAll(['id', 'targetType', 'targetId', 'userId', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'targetType', 'targetId', 'userId', 'createdAt']) &&
+        data.id == likeId &&
+        isValidId(data.id) &&
+        data.targetType in ['profile', 'gallery'] &&
+        isValidId(data.targetId) &&
+        isValidId(data.userId) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSupportTicket(data, ticketId) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'userRole', 'subject',
+          'category', 'description', 'status', 'lastMessage',
+          'lastMessageAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'userId', 'userName', 'userPhoto', 'userRole',
+          'subject', 'category', 'description', 'status',
+          'assignedModeratorId', 'assignedModeratorName',
+          'resolutionNote', 'lastMessage', 'lastMessageAt',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.id == ticketId &&
+        isValidId(data.id) &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'userPhoto', 350000) &&
+        isValidRoleId(data.userRole) &&
+        data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 140 &&
+        data.category in ['complaint', 'report_user', 'technical', 'inquiry'] &&
+        data.description is string && data.description.size() >= 1 && data.description.size() <= 1500 &&
+        data.status in ['open', 'in_progress', 'closed'] &&
+        isOptionalString(data, 'assignedModeratorId', 128) &&
+        isOptionalString(data, 'assignedModeratorName', 80) &&
+        isOptionalString(data, 'resolutionNote', 400) &&
+        data.lastMessage is string && data.lastMessage.size() <= 300 &&
+        data.lastMessageAt is timestamp &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSupportTicketMessage(data, ticketId, messageId) {
+      return data.keys().hasAll([
+          'id', 'ticketId', 'ticketOwnerId', 'senderId',
+          'senderName', 'senderRole', 'text', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'ticketId', 'ticketOwnerId', 'senderId',
+          'senderName', 'senderPhoto', 'senderRole', 'text', 'createdAt'
+        ]) &&
+        data.id == messageId &&
+        data.ticketId == ticketId &&
+        isValidId(data.id) &&
+        isValidId(data.ticketId) &&
+        isValidId(data.ticketOwnerId) &&
+        isValidId(data.senderId) &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'senderPhoto', 350000) &&
+        isValidRoleId(data.senderRole) &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1200 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCommunityMessage(data, messageId) {
+      return data.keys().hasAll([
+          'id', 'senderId', 'senderName', 'senderRole', 'text',
+          'edited', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'senderId', 'senderName', 'senderUsername', 'senderPhoto', 'senderRole',
+          'text', 'replyToId', 'replyToSenderId', 'replyToSenderName',
+          'replyToSenderUsername', 'replyToText', 'mentions',
+          'edited', 'roomType', 'countryCode', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == messageId &&
+        isValidId(data.id) &&
+        isValidId(data.senderId) &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        (!('senderUsername' in data) || (data.senderUsername is string && data.senderUsername.matches('^[a-z0-9_]{1,24}$'))) &&
+        isOptionalSafeMediaUrl(data, 'senderPhoto', 350000) &&
+        isValidRoleId(data.senderRole) &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+        (!('replyToId' in data) || isValidId(data.replyToId)) &&
+        (!('replyToSenderId' in data) || isValidId(data.replyToSenderId)) &&
+        isOptionalString(data, 'replyToSenderName', 80) &&
+        isOptionalString(data, 'replyToSenderUsername', 24) &&
+        isOptionalString(data, 'replyToText', 200) &&
+        (!('mentions' in data) || (
+          data.mentions is list &&
+          data.mentions.size() <= 10 &&
+          (data.mentions.size() == 0 || isValidId(data.mentions[0]))
+        )) &&
+        data.edited is bool &&
+        (!('roomType' in data) || data.roomType in ['global', 'local']) &&
+        isOptionalCountryCode(data) &&
+        data.visibility == 'public' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidStaffMessage(data, messageId) {
+      return data.keys().hasAll([
+          'id', 'senderId', 'senderName', 'senderRole', 'text',
+          'edited', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'senderId', 'senderName', 'senderPhoto', 'senderRole',
+          'text', 'edited', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == messageId &&
+        isValidId(data.id) &&
+        isValidId(data.senderId) &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'senderPhoto', 350000) &&
+        isValidRoleId(data.senderRole) &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1200 &&
+        data.edited is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidStaffGuideline(data, guidelineId) {
+      return data.keys().hasAll([
+          'id', 'authorId', 'authorName', 'title', 'category',
+          'content', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'authorId', 'authorName', 'title', 'category',
+          'content', 'createdAt', 'updatedAt'
+]) &&
+        data.id == guidelineId &&
+        isValidId(data.id) &&
+        isValidId(data.authorId) &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.category in ['duties', 'rules', 'tickets', 'escalation'] &&
+        data.content is string && data.content.size() >= 1 && data.content.size() <= 2000 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidProfilePost(data, postId) {
+      return data.keys().hasAll([
+          'id', 'authorId', 'authorName', 'authorRole', 'text',
+          'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'authorId', 'authorName', 'authorPhoto', 'authorRole',
+          'text', 'imageUrl', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == postId &&
+        isValidId(data.id) &&
+        isValidId(data.authorId) &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'authorPhoto', 350000) &&
+        isValidRoleId(data.authorRole) &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1200 &&
+        isOptionalSafeMediaUrl(data, 'imageUrl', 450000) &&
+        data.visibility == 'public' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidConversation(data, conversationId) {
+      return data.keys().hasAll([
+          'id', 'participant1Id', 'participant2Id',
+          'participant1Name', 'participant2Name',
+          'lastMessage', 'lastMessageAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'participant1Id', 'participant2Id',
+          'participant1Name', 'participant2Name',
+          'participant1Photo', 'participant2Photo',
+          'lastMessage', 'lastMessageAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == conversationId &&
+        isValidId(data.id) &&
+        isValidId(data.participant1Id) &&
+        isValidId(data.participant2Id) &&
+        data.participant1Id != data.participant2Id &&
+        data.participant1Name is string && data.participant1Name.size() >= 1 && data.participant1Name.size() <= 80 &&
+        data.participant2Name is string && data.participant2Name.size() >= 1 && data.participant2Name.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'participant1Photo', 350000) &&
+        isOptionalSafeMediaUrl(data, 'participant2Photo', 350000) &&
+        data.lastMessage is string && data.lastMessage.size() <= 300 &&
+        data.lastMessageAt is timestamp &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateMessage(data, conversationId, messageId) {
+      return data.keys().hasAll([
+          'id', 'conversationId', 'participant1Id', 'participant2Id',
+          'senderId', 'senderName', 'text', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'conversationId', 'participant1Id', 'participant2Id',
+          'senderId', 'senderName', 'text', 'bookingId', 'createdAt'
+        ]) &&
+        data.id == messageId &&
+        data.conversationId == conversationId &&
+        isValidId(data.id) &&
+        isValidId(data.conversationId) &&
+        isValidId(data.participant1Id) &&
+        isValidId(data.participant2Id) &&
+        isValidId(data.senderId) &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+        isOptionalString(data, 'bookingId', 128) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidBooking(data, bookingId) {
+      return data.keys().hasAll([
+          'id', 'conversationId', 'customerId', 'customerName',
+          'barberId', 'barberName', 'serviceId', 'serviceName',
+          'servicePrice', 'serviceDuration', 'date', 'time',
+          'status', 'reviewed', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'conversationId', 'customerId', 'customerName', 'customerPhoto',
+          'barberId', 'barberName', 'barberPhoto', 'serviceId', 'serviceName',
+          'servicePrice', 'serviceDuration', 'date', 'time', 'notes',
+          'status', 'reviewed', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == bookingId &&
+        isValidId(data.id) &&
+        isValidId(data.conversationId) &&
+        isValidId(data.customerId) &&
+        isValidId(data.barberId) &&
+        data.customerId != data.barberId &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'customerPhoto', 350000) &&
+        data.barberName is string && data.barberName.size() >= 1 && data.barberName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'barberPhoto', 350000) &&
+        data.serviceId is string && data.serviceId.size() >= 1 && data.serviceId.size() <= 128 &&
+        data.serviceName is string && data.serviceName.size() >= 1 && data.serviceName.size() <= 100 &&
+        data.servicePrice is number && data.servicePrice >= 0 && data.servicePrice <= 100000 &&
+        data.serviceDuration is number && data.serviceDuration >= 5 && data.serviceDuration <= 480 &&
+        data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+        data.time is string && data.time.matches('^\\d{2}:\\d{2}$') &&
+        isOptionalString(data, 'notes', 400) &&
+        data.status in ['pending', 'confirmed', 'rescheduled', 'rejected', 'completed', 'cancelled'] &&
+        data.reviewed is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidReview(data, reviewId) {
+      return data.keys().hasAll([
+          'id', 'bookingId', 'barberId', 'customerId', 'customerName',
+          'rating', 'comment', 'visibility', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'bookingId', 'barberId', 'customerId', 'customerName',
+          'customerPhoto', 'rating', 'comment', 'visibility', 'createdAt'
+        ]) &&
+        data.id == reviewId &&
+        isValidId(data.id) &&
+        isValidId(data.bookingId) &&
+        isValidId(data.barberId) &&
+        isValidId(data.customerId) &&
+        data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'customerPhoto', 350000) &&
+        data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+        data.comment is string && data.comment.size() >= 1 && data.comment.size() <= 500 &&
+        data.visibility == 'public' &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data, notificationId) {
+      return data.keys().hasAll([
+          'id', 'recipientId', 'senderId', 'senderName', 'type',
+          'title', 'body', 'targetView', 'targetId', 'read', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'recipientId', 'senderId', 'senderName', 'type',
+          'title', 'body', 'targetView', 'targetId', 'read', 'createdAt'
+        ]) &&
+        data.id == notificationId &&
+        isValidId(data.id) &&
+        isValidId(data.recipientId) &&
+        isValidId(data.senderId) &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        data.type in [
+          'message', 'booking_new', 'booking_update', 'role_update', 'moderation',
+          'verification_request', 'ticket_new', 'ticket_update', 'announcement',
+          'story_reaction', 'story_reply', 'friend_request', 'friend_accept',
+          'credit_grant', 'store_purchase'
+        ] &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.body is string && data.body.size() >= 1 && data.body.size() <= 300 &&
+        data.targetView in [
+          'private_chat', 'appointments', 'community', 'profile', 'admin',
+          'tickets', 'staff_room', 'season', 'leaderboard', 'about', 'stories', 'store'
+        ] &&
+        data.targetId is string && data.targetId.size() <= 128 &&
+        data.read is bool &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidActivityLog(data, logId) {
+      return data.keys().hasAll([
+          'id', 'actorId', 'actorName', 'action',
+          'targetUserId', 'targetUserName', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'actorId', 'actorName', 'action',
+          'targetUserId', 'targetUserName', 'reason', 'createdAt'
+        ]) &&
+        data.id == logId &&
+        isValidId(data.id) &&
+        isValidId(data.actorId) &&
+        data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 80 &&
+        data.action is string && data.action.size() >= 1 && data.action.size() <= 100 &&
+        isValidId(data.targetUserId) &&
+        data.targetUserName is string && data.targetUserName.size() >= 1 && data.targetUserName.size() <= 80 &&
+        isOptionalString(data, 'reason', 300) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSeasonVote(data, voteId) {
+      return data.keys().hasAll([
+          'id', 'seasonKey', 'galleryItemId', 'barberId', 'voterId', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'seasonKey', 'galleryItemId', 'barberId', 'voterId', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == voteId &&
+        isValidId(data.id) &&
+        data.seasonKey is string && data.seasonKey.matches('^[a-zA-Z0-9_\\-]{2,40}$') &&
+        isValidId(data.galleryItemId) &&
+        isValidId(data.barberId) &&
+        isValidId(data.voterId) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSeasonAward(data, awardId) {
+      return data.keys().hasAll([
+          'id', 'seasonKey', 'seasonLabel', 'barberId', 'barberName',
+          'galleryItemId', 'galleryItemTitle', 'galleryItemImageUrl',
+          'votesCount', 'awardedById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'seasonKey', 'seasonLabel', 'barberId', 'barberName', 'barberPhoto',
+          'galleryItemId', 'galleryItemTitle', 'galleryItemImageUrl',
+          'votesCount', 'awardedById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == awardId &&
+        data.seasonKey == awardId &&
+        data.seasonKey is string && data.seasonKey.matches('^[a-zA-Z0-9_\\-]{2,40}$') &&
+        data.seasonLabel is string && data.seasonLabel.size() >= 1 && data.seasonLabel.size() <= 80 &&
+        isValidId(data.barberId) &&
+        data.barberName is string && data.barberName.size() >= 1 && data.barberName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'barberPhoto', 350000) &&
+        isValidId(data.galleryItemId) &&
+        data.galleryItemTitle is string && data.galleryItemTitle.size() >= 1 && data.galleryItemTitle.size() <= 100 &&
+        isSafeMediaUrlString(data.galleryItemImageUrl, 400000) &&
+        data.galleryItemImageUrl.size() >= 1 &&
+        data.votesCount is int && data.votesCount >= 0 && data.votesCount <= 1000000 &&
+        isValidId(data.awardedById) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSeasonConfig(data, configId) {
+      return data.keys().hasAll([
+          'id', 'isHidden', 'isVotingOpen', 'activeSeasonKey',
+          'activeSeasonLabel', 'updatedById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'isHidden', 'isVotingOpen', 'activeSeasonKey',
+          'activeSeasonLabel', 'contestHeadline', 'contestSubtitle',
+          'updatedById', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == configId &&
+        configId == 'current' &&
+        data.isHidden is bool &&
+        data.isVotingOpen is bool &&
+        data.activeSeasonKey is string && data.activeSeasonKey.matches('^[a-zA-Z0-9_\\-]{2,40}$') &&
+        data.activeSeasonLabel is string && data.activeSeasonLabel.size() >= 1 && data.activeSeasonLabel.size() <= 80 &&
+        isOptionalString(data, 'contestHeadline', 140) &&
+        isOptionalString(data, 'contestSubtitle', 500) &&
+        isValidId(data.updatedById) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isSeasonVotingActive(targetSeasonKey) {
+      return exists(/databases/$(database)/documents/seasonConfig/current) &&
+        get(/databases/$(database)/documents/seasonConfig/current).data.isHidden == false &&
+        get(/databases/$(database)/documents/seasonConfig/current).data.isVotingOpen == true &&
+        get(/databases/$(database)/documents/seasonConfig/current).data.activeSeasonKey == targetSeasonKey;
+    }
+
+    function isValidBarberStory(data, storyId) {
+      return data.keys().hasAll([
+          'id', 'barberId', 'barberName', 'mediaType', 'mediaUrl',
+          'visibility', 'expiresAt', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'barberId', 'barberName', 'barberPhoto', 'salonName',
+          'mediaType', 'mediaUrl', 'beforeMediaUrl', 'caption',
+          'countryCode', 'visibility', 'expiresAt', 'createdAt'
+        ]) &&
+        data.id == storyId &&
+        isValidId(data.id) &&
+        isValidId(data.barberId) &&
+        data.barberName is string && data.barberName.size() >= 1 && data.barberName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'barberPhoto', 350000) &&
+        isOptionalString(data, 'salonName', 100) &&
+        data.mediaType in ['image', 'before_after', 'video'] &&
+        isSafeStoryMediaUrlString(data.mediaUrl, 750000) &&
+        data.mediaUrl.size() >= 1 &&
+        isOptionalSafeMediaUrl(data, 'beforeMediaUrl', 360000) &&
+        isOptionalString(data, 'caption', 200) &&
+        isOptionalCountryCode(data) &&
+        data.visibility == 'public' &&
+        data.expiresAt is timestamp &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidStoryReaction(data, reactionId) {
+      return data.keys().hasAll([
+          'id', 'storyId', 'storyAuthorId', 'userId', 'userName',
+          'reaction', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'storyId', 'storyAuthorId', 'userId', 'userName',
+          'userPhoto', 'reaction', 'emojiKey', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == reactionId &&
+        isValidId(data.id) &&
+        isValidId(data.storyId) &&
+        isValidId(data.storyAuthorId) &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'userPhoto', 350000) &&
+data.reaction is string && data.reaction.size() >= 1 && data.reaction.size() <= 32 &&
+        (!('emojiKey' in data) || (data.emojiKey is string && data.emojiKey.matches('^[a-z0-9_]{1,64}$'))) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPlatformAnnouncement(data, announcementId) {
+      return data.keys().hasAll([
+          'id', 'authorId', 'authorName', 'title', 'summary',
+          'badge', 'isPinned', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'authorId', 'authorName', 'title', 'summary',
+          'badge', 'targetWindow', 'isPinned', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == announcementId &&
+        isValidId(data.id) &&
+        isValidId(data.authorId) &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 1200 &&
+        data.badge in ['coming_soon', 'in_development', 'major_update', 'new_feature'] &&
+        isOptionalString(data, 'targetWindow', 60) &&
+        data.isPinned is bool &&
+        data.visibility == 'public' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidFriendship(data, friendshipId) {
+      return data.keys().hasAll([
+          'id', 'user1Id', 'user2Id', 'requesterId', 'recipientId',
+          'requesterName', 'recipientName', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'user1Id', 'user2Id', 'requesterId', 'recipientId',
+          'requesterName', 'requesterPhoto', 'recipientName', 'recipientPhoto',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id == friendshipId &&
+        isValidId(data.id) &&
+        isValidId(data.user1Id) &&
+        isValidId(data.user2Id) &&
+        data.user1Id < data.user2Id &&
+        friendshipId == (data.user1Id + '_' + data.user2Id) &&
+        isValidId(data.requesterId) &&
+        isValidId(data.recipientId) &&
+        data.requesterId != data.recipientId &&
+        (
+          (data.requesterId == data.user1Id && data.recipientId == data.user2Id) ||
+          (data.requesterId == data.user2Id && data.recipientId == data.user1Id)
+        ) &&
+        data.requesterName is string && data.requesterName.size() >= 1 && data.requesterName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'requesterPhoto', 350000) &&
+        data.recipientName is string && data.recipientName.size() >= 1 && data.recipientName.size() <= 80 &&
+        isOptionalSafeMediaUrl(data, 'recipientPhoto', 350000) &&
+        data.status in ['pending', 'accepted'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTypingStatus(data, typingId) {
+      return data.keys().hasAll([
+          'id', 'scope', 'roomKey', 'userId', 'userName', 'isTyping', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'scope', 'roomKey', 'userId', 'userName', 'isTyping', 'updatedAt'
+        ]) &&
+        data.id == typingId &&
+        isValidId(data.id) &&
+        data.scope in ['global', 'local'] &&
+        data.roomKey is string && data.roomKey.matches('^(global|local_[A-Z]{2})$') &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 80 &&
+        data.isTyping is bool &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidConversationTyping(data, conversationId, userId) {
+      return data.keys().hasAll([
+          'id', 'conversationId', 'participant1Id', 'participant2Id',
+          'userId', 'userName', 'isTyping', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'conversationId', 'participant1Id', 'participant2Id',
+          'userId', 'userName', 'isTyping', 'updatedAt'
+        ]) &&
+        data.id == userId &&
+        data.conversationId == conversationId &&
+        isValidId(data.id) &&
+        isValidId(data.conversationId) &&
+        isValidId(data.participant1Id) &&
+        isValidId(data.participant2Id) &&
+        isValidId(data.userId) &&
+        data.userId == userId &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 80 &&
+        data.isTyping is bool &&
+        data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Public User Profiles + Private PII Subcollection + Blocked Users Subcollection
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.isPublicProfile == true;
+
+      allow create: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        incoming().isMuted == false &&
+        incoming().isKicked == false &&
+        incoming().isBanned == false &&
+        (!('points' in incoming()) || incoming().points == 0) &&
+        (!('completedBookingsCount' in incoming()) || incoming().completedBookingsCount == 0) &&
+        (!('canPostStory' in incoming()) || incoming().canPostStory == false) &&
+        (
+          (incoming().role == 'customer' && (!('roles' in incoming()) || (incoming().roles.size() == 1 && incoming().roles[0] == 'customer'))) ||
+          (isSuperAdmin() && incoming().role == 'admin' && (!('roles' in incoming()) || (incoming().roles.size() == 1 && incoming().roles[0] == 'admin')))
+        );
+
+      allow update: if isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        (
+          (('createdAt' in existing()) && incoming().createdAt == existing().createdAt) ||
+          (!('createdAt' in existing()) && incoming().createdAt == request.time)
+        ) &&
+        incoming().updatedAt == request.time &&
+        incoming().isPublicProfile == true &&
+        (
+          (
+            isSuperAdmin() &&
+            (userId == request.auth.uid || (incoming().role != 'admin' && (!('roles' in incoming()) || !('admin' in incoming().roles))))
+          ) ||
+          (
+            isStaffMember() &&
+            existing().role != 'admin' &&
+            (!('roles' in existing()) || !('admin' in existing().roles)) &&
+            incoming().role == existing().role &&
+            incoming().get('roles', [existing().role]) == existing().get('roles', [existing().role]) &&
+            (
+              (
+                canBanMembers() &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'isMuted', 'muteReason', 'isKicked', 'kickReason', 'isBanned', 'banReason', 'updatedAt'
+                ])
+              ) ||
+              (
+                incoming().isBanned == existing().isBanned &&
+                incoming().get('banReason', '') == existing().get('banReason', '') &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'isMuted', 'muteReason', 'isKicked', 'kickReason', 'updatedAt'
+                ])
+              )
+            )
+          ) ||
+          (
+            isOwner(userId) &&
+            existing().get('isBanned', false) == false &&
+            incoming().role == existing().get('role', 'customer') &&
+            (
+              incoming().get('roles', [incoming().role]) == existing().get('roles', [incoming().role]) ||
+              ((!('roles' in existing()) || !(existing().roles is list) || existing().roles.size() == 0) && incoming().roles == [incoming().role])
+            ) &&
+            incoming().isMuted == existing().get('isMuted', false) &&
+            incoming().isBanned == existing().get('isBanned', false) &&
+            (
+              // Standard owner profile edit (handle changes blocked if Founder special ID or reserved handle)
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'displayName', 'username', 'photoURL', 'coverURL', 'bio', 'availability', 'liveStatus',
+                  'salonName', 'addressLabel', 'location', 'services', 'countryCode',
+                  'friendRequestPolicy', 'hideOnlineStatus', 'isOnline', 'lastActiveAt', 'updatedAt'
+                ]) &&
+                (
+                  incoming().get('username', '') == existing().get('username', '') ||
+                  (
+                    existing().get('isSpecialId', false) == false &&
+                    existing().get('specialIdGrantedBy', '') != 'admin' &&
+                    !isReservedHandle(incoming().username)
+                  )
+                )
+              ) ||
+              // Legacy profile bootstrap cleanup (strip deprecated 'email' PII field or backfill missing required defaults)
+              (
+                (
+                  ('email' in existing() && !('email' in incoming())) ||
+                  !('createdAt' in existing()) ||
+                  !('isPublicProfile' in existing()) ||
+                  existing().isPublicProfile != true ||
+                  !('availability' in existing()) ||
+                  !('isMuted' in existing()) ||
+                  !('isKicked' in existing()) ||
+                  !('isBanned' in existing()) ||
+                  !('roles' in existing()) ||
+                  !(existing().roles is list) ||
+                  existing().roles.size() == 0 ||
+                  existing().get('displayName', '') == '' ||
+                  !('points' in existing()) ||
+                  !(existing().points is int) ||
+                  existing().points < 0
+                ) &&
+                !('email' in incoming()) &&
+                incoming().isKicked == existing().get('isKicked', false) &&
+                (
+                  incoming().displayName == existing().get('displayName', '') ||
+                  (existing().get('displayName', '') == '' && incoming().displayName is string && incoming().displayName.size() >= 1)
+                ) &&
+                (
+                  (('points' in existing()) && existing().points is int && existing().points >= 0 && incoming().points == existing().points) ||
+                  (!('points' in existing()) && incoming().points == 0) ||
+                  (('points' in existing()) && !(existing().points is int) && existing().points is number && existing().points >= 0 && incoming().points is int && incoming().points >= 0 && incoming().points <= int(existing().points) + 1) ||
+                  (('points' in existing()) && existing().points is number && existing().points < 0 && incoming().points == 0) ||
+                  (('points' in existing()) && !(existing().points is number) && incoming().points == 0)
+                ) &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'email', 'username', 'countryCode', 'roles', 'availability', 'liveStatus',
+                  'displayName', 'points', 'createdAt', 'isMuted', 'isKicked', 'isBanned',
+                  'isPublicProfile', 'photoURL', 'coverURL', 'isOnline', 'lastActiveAt', 'updatedAt'
+                ]) &&
+                (
+                  incoming().get('username', '') == existing().get('username', '') ||
+                  (
+                    existing().get('isSpecialId', false) == false &&
+                    existing().get('specialIdGrantedBy', '') != 'admin' &&
+                    !isReservedHandle(incoming().username)
+                  )
+                )
+              ) ||
+              // Self-unkick recovery
+              (
+                incoming().isKicked == false &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['isKicked', 'kickReason', 'updatedAt'])
+              ) ||
+              // Activity credit award (chat +2, gallery like +3, story +10, review +20, booking +25)
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly(['points', 'updatedAt']) &&
+                incoming().points is int &&
+                incoming().points > existing().get('points', 0) &&
+                incoming().points <= existing().get('points', 0) + 40
+              ) ||
+              // Daily login reward claim
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly(['points', 'lastDailyClaimDate', 'updatedAt']) &&
+                incoming().points is int &&
+                incoming().points > existing().get('points', 0) &&
+                incoming().points <= existing().get('points', 0) + getDailyRewardCap() &&
+                incoming().lastDailyClaimDate != existing().get('lastDailyClaimDate', '')
+              ) ||
+              // Barber completed booking counter + reward (+40)
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly(['completedBookingsCount', 'points', 'updatedAt']) &&
+                incoming().completedBookingsCount is int &&
+                incoming().completedBookingsCount == existing().get('completedBookingsCount', 0) + 1 &&
+                (
+                  !('points' in incoming()) ||
+                  (incoming().points >= existing().get('points', 0) && incoming().points <= existing().get('points', 0) + 40)
+                )
+              ) ||
+              // Store purchase 1: Special ID (exact point deduction + non-reserved + bounded expiration)
+              (
+                isStoreItemEnabled('special_id') &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'points', 'baseUsername', 'username', 'isSpecialId',
+                  'specialIdLabel', 'specialIdExpiresAt', 'specialIdGrantedBy', 'updatedAt'
+                ]) &&
+                incoming().points is int &&
+                incoming().points >= 0 &&
+                (existing().get('points', 0) - incoming().points) == getStoreItemPrice('special_id', 250) &&
+                incoming().isSpecialId == true &&
+                incoming().specialIdGrantedBy == 'store' &&
+                !isReservedHandle(incoming().username) &&
+                incoming().specialIdExpiresAt is timestamp &&
+                incoming().specialIdExpiresAt > request.time &&
+                incoming().specialIdExpiresAt <= request.time + duration.value(getStoreItemDurationDays('special_id') + 1, 'd')
+              ) ||
+              // Store purchase 2: Name Color
+              (
+                isStoreItemEnabled('name_color') &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'points', 'nameColor', 'nameColorExpiresAt', 'updatedAt'
+                ]) &&
+                incoming().points is int &&
+                incoming().points >= 0 &&
+                (existing().get('points', 0) - incoming().points) == getStoreItemPrice('name_color', 120) &&
+                incoming().nameColor in ['gold_royal', 'emerald_neon', 'crimson_ruby', 'sapphire_sky', 'violet_amethyst'] &&
+                incoming().nameColorExpiresAt is timestamp &&
+                incoming().nameColorExpiresAt > request.time &&
+                incoming().nameColorExpiresAt <= request.time + duration.value(getStoreItemDurationDays('name_color') + 1, 'd')
+              ) ||
+              // Store purchase 3: Tiered Credit Store Avatar Frames
+              (
+                isStoreItemEnabled('avatar_frame') &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'points', 'avatarFrame', 'avatarFrameExpiresAt', 'updatedAt'
+                ]) &&
+                incoming().points is int &&
+                incoming().points >= 0 &&
+                (
+                  (incoming().avatarFrame == 'obsidian_bronze' && (existing().get('points', 0) - incoming().points) == 100) ||
+                  (incoming().avatarFrame == 'emerald_royal' && (existing().get('points', 0) - incoming().points) == 140) ||
+                  (incoming().avatarFrame == 'gold_crown' && (existing().get('points', 0) - incoming().points) == 150) ||
+                  (incoming().avatarFrame == 'ruby_flame' && (existing().get('points', 0) - incoming().points) == 180) ||
+                  (incoming().avatarFrame == 'sapphire_neon' && (existing().get('points', 0) - incoming().points) == 200) ||
+                  (incoming().avatarFrame == 'platinum_diamond' && (existing().get('points', 0) - incoming().points) == 260)
+                ) &&
+                incoming().avatarFrameExpiresAt is timestamp &&
+incoming().avatarFrameExpiresAt > request.time &&
+                incoming().avatarFrameExpiresAt <= request.time + duration.value(getStoreItemDurationDays('avatar_frame') + 1, 'd')
+              ) ||
+              // Free Rank-Locked Avatar Frame Equip / Unequip (zero points deducted)
+              (
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'avatarFrame', 'avatarFrameExpiresAt', 'updatedAt'
+                ]) &&
+                incoming().avatarFrameExpiresAt == null &&
+                (
+                  incoming().avatarFrame == '' ||
+                  (incoming().avatarFrame == 'founder_sovereign' && (isSuperAdmin() || userHasRole(existing(), 'admin'))) ||
+                  (incoming().avatarFrame == 'rank_deputy' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'deputy_director'))) ||
+                  (incoming().avatarFrame == 'rank_moderator' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'moderator'))) ||
+                  (incoming().avatarFrame == 'rank_chat_mod' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'chat_moderator'))) ||
+                  (incoming().avatarFrame == 'rank_vip_barber' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'vip_barber'))) ||
+                  (incoming().avatarFrame == 'rank_master_barber' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'master_barber'))) ||
+                  (incoming().avatarFrame == 'rank_verified_barber' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'barber_verified'))) ||
+                  (incoming().avatarFrame == 'rank_vip_member' && (isSuperAdmin() || userHasRole(existing(), 'admin') || userHasRole(existing(), 'vip_member')))
+                )
+              ) ||
+              // Store purchase 4: Chat Distinction Title
+              (
+                isStoreItemEnabled('chat_title') &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'points', 'chatTitle', 'chatTitleExpiresAt', 'updatedAt'
+                ]) &&
+                incoming().points is int &&
+                incoming().points >= 0 &&
+                (existing().get('points', 0) - incoming().points) == getStoreItemPrice('chat_title', 90) &&
+                (
+                  incoming().chatTitle in ['community_star', 'refined_taste', 'guest_of_honor', 'elite_supporter', 'style_icon'] ||
+                  (incoming().chatTitle == 'founder_dean' && (isSuperAdmin() || userHasRole(existing(), 'admin')))
+                ) &&
+                incoming().chatTitleExpiresAt is timestamp &&
+                incoming().chatTitleExpiresAt > request.time &&
+                incoming().chatTitleExpiresAt <= request.time + duration.value(getStoreItemDurationDays('chat_title') + 1, 'd')
+              ) ||
+              // Store purchase 5: Credit Pass
+              (
+                isStoreItemEnabled('credit_pass') &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'points', 'creditPassTier', 'creditPassExpiresAt', 'updatedAt'
+                ]) &&
+                incoming().points is int &&
+                incoming().points >= 0 &&
+                (existing().get('points', 0) - incoming().points) == getStoreItemPrice('credit_pass', 200) &&
+                incoming().creditPassTier == 'aurelius_credit_pass' &&
+                incoming().creditPassExpiresAt is timestamp &&
+                incoming().creditPassExpiresAt > request.time &&
+                incoming().creditPassExpiresAt <= request.time + duration.value(getStoreItemDurationDays('credit_pass') + 1, 'd')
+              ) ||
+              // Expired Special ID cleanup back to base numeric ID
+              (
+                existing().get('isSpecialId', false) == true &&
+                'specialIdExpiresAt' in existing() &&
+                existing().specialIdExpiresAt is timestamp &&
+                existing().specialIdExpiresAt <= request.time &&
+                incoming().isSpecialId == false &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'username', 'isSpecialId', 'specialIdLabel', 'specialIdExpiresAt', 'specialIdGrantedBy', 'updatedAt'
+                ])
+              )
+            )
+          )
+        );
+
+      // Owner self-deletion (non-admin) or Founder deletion of non-self users
+      allow delete: if isValidId(userId) && (
+        (isOwner(userId) && !isSuperAdmin() && existing().role != 'admin') ||
+        (isSuperAdmin() && userId != request.auth.uid)
+      );
+
+      match /private/info {
+        allow get: if isValidId(userId) && (isOwner(userId) || isSuperAdmin());
+        allow create: if isValidId(userId) &&
+          isOwner(userId) &&
+          isValidUserPrivateInfo(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) &&
+          (isOwner(userId) || isSuperAdmin()) &&
+          isValidUserPrivateInfo(incoming(), userId) &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt']);
+        allow delete: if isValidId(userId) && (isOwner(userId) || isSuperAdmin());
+      }
+
+      match /blockedUsers/{blockedUid} {
+        allow get, list: if isValidId(userId) && (isOwner(userId) || isSuperAdmin());
+        allow create: if isValidId(userId) &&
+          isValidId(blockedUid) &&
+          isOwner(userId) &&
+          isNotBanned() &&
+          blockedUid != request.auth.uid &&
+          isValidBlockedUser(incoming(), userId, blockedUid) &&
+          incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(blockedUid) && (isOwner(userId) || isSuperAdmin());
+      }
+    }
+
+    // 2. Barber Verification Requests
+    match /verificationRequests/{requestId} {
+      allow get: if isValidId(requestId) && isVerifiedEmail() &&
+        (existing().userId == request.auth.uid || isSuperAdmin());
+      allow list: if isSuperAdmin() ||
+        (isVerifiedEmail() && resource.data.userId == request.auth.uid);
+
+      allow create: if isValidId(requestId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidVerificationRequest(incoming(), requestId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'pending' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(requestId) &&
+        isSuperAdmin() &&
+        isValidVerificationRequest(incoming(), requestId) &&
+        incoming().id == existing().id &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().status in ['approved', 'rejected'] &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminNote', 'updatedAt']);
+
+      allow delete: if isValidId(requestId) && (isSuperAdmin() || isOwner(existing().userId));
+    }
+
+    // 3. Gallery (VIP / Master Barbers & Founder)
+    match /gallery/{itemId} {
+      allow get: if isValidId(itemId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.visibility == 'public';
+
+      allow create: if isValidId(itemId) &&
+        isVipBarberOrAdmin() &&
+        isValidGalleryItem(incoming(), itemId) &&
+        (incoming().barberId == request.auth.uid || isSuperAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(itemId) &&
+        isValidGalleryItem(incoming(), itemId) &&
+        incoming().id == existing().id &&
+        incoming().barberId == existing().barberId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          (
+            isOwner(existing().barberId) &&
+            isVipBarberOrAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'category', 'imageUrl',
+              'isBeforeAfter', 'beforeImageUrl', 'barberName', 'barberPhoto', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(itemId) && (isSuperAdmin() || (isOwner(existing().barberId) && isNotBanned()));
+    }
+
+    // 4. Dual Likes (Barber Profiles & Individual Gallery Works)
+    match /likes/{likeId} {
+      allow get: if isValidId(likeId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && (resource.data.targetType == 'profile' || resource.data.targetType == 'gallery');
+
+      allow create: if isValidId(likeId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidLikeRecord(incoming(), likeId) &&
+        incoming().userId == request.auth.uid &&
+        likeId == (incoming().targetType + '_' + incoming().targetId + '_' + request.auth.uid) &&
+        incoming().createdAt == request.time;
+
+      allow delete: if isValidId(likeId) && isVerifiedEmail() && (existing().userId == request.auth.uid || isSuperAdmin());
+    }
+
+    // 5. Confidential Support Tickets & Staff Queue
+    match /supportTickets/{ticketId} {
+      allow get: if isValidId(ticketId) && isVerifiedEmail() &&
+        (existing().userId == request.auth.uid || isModeratorOrAdmin());
+      allow list: if isModeratorOrAdmin() ||
+        (isVerifiedEmail() && resource.data.userId == request.auth.uid);
+
+      allow create: if isValidId(ticketId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidSupportTicket(incoming(), ticketId) &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'open' &&
+        (!('assignedModeratorId' in incoming()) || incoming().assignedModeratorId == '') &&
+        (!('assignedModeratorName' in incoming()) || incoming().assignedModeratorName == '') &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        incoming().lastMessageAt == request.time;
+
+      allow update: if isValidId(ticketId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidSupportTicket(incoming(), ticketId) &&
+        incoming().id == existing().id &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          (
+            existing().status != 'closed' &&
+            (
+              (
+                isModeratorOrAdmin() &&
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'status', 'assignedModeratorId', 'assignedModeratorName',
+                  'resolutionNote', 'lastMessage', 'lastMessageAt', 'updatedAt'
+                ])
+              ) ||
+              (
+                isOwner(existing().userId) &&
+                (
+                  (
+                    incoming().status == existing().status &&
+                    incoming().diff(existing()).affectedKeys().hasOnly([
+                      'lastMessage', 'lastMessageAt', 'updatedAt'
+                    ])
+                  ) ||
+                  (
+                    incoming().status == 'closed' &&
+                    incoming().diff(existing()).affectedKeys().hasOnly([
+                      'status', 'resolutionNote', 'updatedAt'
+                    ])
+                  )
+                )
+              )
+            )
+          )
+        );
+
+      allow delete: if isValidId(ticketId) && (isSuperAdmin() || isOwner(existing().userId));
+
+      match /messages/{messageId} {
+        allow get: if isValidId(ticketId) && isValidId(messageId) && isVerifiedEmail() &&
+          (existing().ticketOwnerId == request.auth.uid || isModeratorOrAdmin());
+        allow list: if isModeratorOrAdmin() ||
+          (
+            isVerifiedEmail() &&
+            resource.data.ticketId == ticketId &&
+            resource.data.ticketOwnerId == request.auth.uid
+          );
+
+        allow create: if isValidId(ticketId) && isValidId(messageId) &&
+          isVerifiedEmail() &&
+          isNotBanned() &&
+          isValidSupportTicketMessage(incoming(), ticketId, messageId) &&
+          incoming().senderId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/supportTickets/$(ticketId)) &&
+          get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId == incoming().ticketOwnerId &&
+          (
+            isSuperAdmin() ||
+            (
+              get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.status != 'closed' &&
+              (
+                incoming().ticketOwnerId == request.auth.uid ||
+                isModeratorOrAdmin()
+              )
+            )
+          );
+
+        allow delete: if isValidId(ticketId) && isValidId(messageId) &&
+          (isSuperAdmin() || isOwner(existing().ticketOwnerId));
+      }
+    }
+
+    // 6. Community Chat
+    match /communityMessages/{messageId} {
+      allow get: if isValidId(messageId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.visibility == 'public';
+
+      allow create: if isValidId(messageId) &&
+        isVerifiedEmail() &&
+        isNotMutedOrKicked() &&
+        isValidCommunityMessage(incoming(), messageId) &&
+        incoming().senderId == request.auth.uid &&
+        incoming().edited == false &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(messageId) &&
+        isValidCommunityMessage(incoming(), messageId) &&
+        incoming().id == existing().id &&
+        incoming().senderId == existing().senderId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isModeratorOrAdmin() ||
+          (
+            isOwner(existing().senderId) &&
+            isNotMutedOrKicked() &&
+            incoming().edited == true &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['text', 'edited', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(messageId) && (isModeratorOrAdmin() || (isOwner(existing().senderId) && isNotBanned()));
+    }
