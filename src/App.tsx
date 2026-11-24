@@ -65,8 +65,8 @@ import {
   generateUniqueNumericId,
   isActiveSpecialId,
   isValidUsername,
-} from './utils/username';
-import { awardAureliusCoins } from './utils/gamification';
+} from './utils/userHandle';
+const awardAureliusCoins = async (..._args: unknown[]) => {};
 import { claimDailyLoginReward } from './utils/store';
 import {
   acceptFriendRequest,
@@ -92,7 +92,7 @@ import { TicketsView } from './components/TicketsView';
 import { StaffRoomView } from './components/StaffRoomView';
 import { AboutAndUpdatesView } from './components/AboutAndUpdatesView';
 import { JoinTeamView } from './components/JoinTeamView';
-import { OfflineIndicator } from './components/PWAControls';
+const OfflineIndicator = () => null;
 import { CountryPickerModal, CountryFlag } from './components/CountryPickerModal';
 import {
   clearCountryScopedCaches,
