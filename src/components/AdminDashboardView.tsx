@@ -56,7 +56,6 @@ import {
   UserRole,
   VerificationRequest,
 const getUserHandle = (..._args: unknown[]) => ''; const isActiveSpecialId = (..._args: unknown[]) => false; const isValidUsername = (..._args: unknown[]) => true; const normalizeUsernameInput = (..._args: unknown[]) => '';
-import { CountryFlag } from './CountryPickerModal';
 import {
   Avatar,
   MultiRoleSelector,
