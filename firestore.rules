@@ -1548,3 +1548,613 @@ incoming().avatarFrameExpiresAt > request.time &&
 
       allow delete: if isValidId(messageId) && (isModeratorOrAdmin() || (isOwner(existing().senderId) && isNotBanned()));
     }
+    // 7. Profile Posts
+    match /posts/{postId} {
+      allow get: if isValidId(postId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.visibility == 'public';
+
+      allow create: if isValidId(postId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidProfilePost(incoming(), postId) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(postId) &&
+        isValidProfilePost(incoming(), postId) &&
+        incoming().id == existing().id &&
+        incoming().authorId == existing().authorId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          (
+            isOwner(existing().authorId) &&
+            isNotBanned() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'text', 'imageUrl', 'authorName', 'authorPhoto', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(postId) && (isSuperAdmin() || isModeratorOrAdmin() || (isOwner(existing().authorId) && isNotBanned()));
+    }
+
+    // 8. Private Conversations & Messages Subcollection
+    match /conversations/{conversationId} {
+      allow get: if isValidId(conversationId) && isVerifiedEmail() &&
+        (existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid);
+      allow list: if isVerifiedEmail() &&
+        (resource.data.participant1Id == request.auth.uid || resource.data.participant2Id == request.auth.uid);
+
+      allow create: if isValidId(conversationId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidConversation(incoming(), conversationId) &&
+        (incoming().participant1Id == request.auth.uid || incoming().participant2Id == request.auth.uid) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(conversationId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidConversation(incoming(), conversationId) &&
+        (existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid) &&
+        incoming().id == existing().id &&
+        incoming().participant1Id == existing().participant1Id &&
+        incoming().participant2Id == existing().participant2Id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'lastMessage', 'lastMessageAt', 'participant1Name', 'participant2Name',
+          'participant1Photo', 'participant2Photo', 'updatedAt'
+        ]);
+
+      allow delete: if isValidId(conversationId) && isVerifiedEmail() &&
+        (existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid);
+
+      match /messages/{messageId} {
+        allow get: if isValidId(conversationId) && isValidId(messageId) && isVerifiedEmail() &&
+          (existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid);
+        allow list: if isVerifiedEmail() &&
+          resource.data.conversationId == conversationId &&
+          (resource.data.participant1Id == request.auth.uid || resource.data.participant2Id == request.auth.uid);
+
+        allow create: if isValidId(conversationId) && isValidId(messageId) &&
+          isVerifiedEmail() &&
+          isNotBanned() &&
+          isValidPrivateMessage(incoming(), conversationId, messageId) &&
+          incoming().senderId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/conversations/$(conversationId)) &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participant1Id == incoming().participant1Id &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participant2Id == incoming().participant2Id &&
+          (incoming().participant1Id == request.auth.uid || incoming().participant2Id == request.auth.uid);
+
+        allow delete: if isValidId(conversationId) && isValidId(messageId) && isVerifiedEmail() &&
+          (existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid);
+      }
+
+      match /typing/{userId} {
+        allow get: if isValidId(conversationId) && isValidId(userId) && isVerifiedEmail() &&
+          (existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid);
+        allow list: if isVerifiedEmail() &&
+          resource.data.conversationId == conversationId &&
+          (resource.data.participant1Id == request.auth.uid || resource.data.participant2Id == request.auth.uid);
+
+        allow create, update: if isValidId(conversationId) && isValidId(userId) &&
+          isVerifiedEmail() &&
+          isNotBanned() &&
+          userId == request.auth.uid &&
+          isValidConversationTyping(incoming(), conversationId, userId) &&
+          incoming().userId == request.auth.uid &&
+          incoming().updatedAt == request.time &&
+          exists(/databases/$(database)/documents/conversations/$(conversationId)) &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participant1Id == incoming().participant1Id &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.participant2Id == incoming().participant2Id &&
+          (incoming().participant1Id == request.auth.uid || incoming().participant2Id == request.auth.uid);
+
+        allow delete: if isValidId(conversationId) && isValidId(userId) && isVerifiedEmail() &&
+          (userId == request.auth.uid || existing().participant1Id == request.auth.uid || existing().participant2Id == request.auth.uid);
+      }
+    }
+
+    // 9. Bookings (Appointment Reservations with Barbers)
+    match /bookings/{bookingId} {
+      allow get: if isValidId(bookingId) && isVerifiedEmail() &&
+        (existing().customerId == request.auth.uid || existing().barberId == request.auth.uid || isSuperAdmin());
+      allow list: if isVerifiedEmail() &&
+        (resource.data.customerId == request.auth.uid || resource.data.barberId == request.auth.uid || isSuperAdmin());
+
+      allow create: if isValidId(bookingId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidBooking(incoming(), bookingId) &&
+        incoming().customerId == request.auth.uid &&
+        incoming().status == 'pending' &&
+        incoming().reviewed == false &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        userExists(incoming().barberId) &&
+        (
+          userHasRole(getUserData(incoming().barberId), 'barber_verified') ||
+          userHasRole(getUserData(incoming().barberId), 'master_barber') ||
+          userHasRole(getUserData(incoming().barberId), 'vip_barber') ||
+          hasDynamicRolePerm(getUserData(incoming().barberId), 'receiveBookings')
+        );
+
+      allow update: if isValidId(bookingId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidBooking(incoming(), bookingId) &&
+        incoming().id == existing().id &&
+        incoming().conversationId == existing().conversationId &&
+        incoming().customerId == existing().customerId &&
+        incoming().barberId == existing().barberId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          (
+            existing().reviewed == false &&
+            existing().barberId == request.auth.uid &&
+            incoming().reviewed == existing().reviewed &&
+            incoming().status in ['pending', 'confirmed', 'rescheduled', 'rejected', 'completed', 'cancelled'] &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'date', 'time', 'notes', 'updatedAt'])
+          ) ||
+          (
+            !(existing().status in ['rejected', 'cancelled', 'completed']) &&
+            existing().customerId == request.auth.uid &&
+            incoming().reviewed == existing().reviewed &&
+            (
+              (incoming().status == 'cancelled' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+              (existing().status == 'rescheduled' && incoming().status == 'confirmed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+            )
+          ) ||
+          (
+            existing().customerId == request.auth.uid &&
+            existing().status == 'completed' &&
+            existing().reviewed == false &&
+            incoming().status == 'completed' &&
+            incoming().reviewed == true &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['reviewed', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(bookingId) && isVerifiedEmail() &&
+        (isSuperAdmin() || (isNotBanned() && (existing().customerId == request.auth.uid || existing().barberId == request.auth.uid)));
+    }
+
+    // 10. Reviews (Post-Appointment Star Ratings)
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.visibility == 'public';
+
+      allow create: if isValidId(reviewId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidReview(incoming(), reviewId) &&
+        incoming().customerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        exists(/databases/$(database)/documents/bookings/$(incoming().bookingId)) &&
+        get(/databases/$(database)/documents/bookings/$(incoming().bookingId)).data.customerId == request.auth.uid &&
+        get(/databases/$(database)/documents/bookings/$(incoming().bookingId)).data.barberId == incoming().barberId &&
+        get(/databases/$(database)/documents/bookings/$(incoming().bookingId)).data.status == 'completed';
+
+      allow delete: if isValidId(reviewId) && (isSuperAdmin() || isOwner(existing().customerId));
+    }
+
+    // 11. Live Notifications
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isVerifiedEmail() &&
+        (existing().recipientId == request.auth.uid || isSuperAdmin());
+      allow list: if isVerifiedEmail() &&
+        (resource.data.recipientId == request.auth.uid || isSuperAdmin());
+
+      allow create: if isValidId(notificationId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidNotification(incoming(), notificationId) &&
+        incoming().senderId == request.auth.uid &&
+        incoming().read == false &&
+        incoming().createdAt == request.time;
+
+      allow update: if isValidId(notificationId) &&
+        isVerifiedEmail() &&
+        isValidNotification(incoming(), notificationId) &&
+        isOwner(existing().recipientId) &&
+        incoming().id == existing().id &&
+        incoming().recipientId == existing().recipientId &&
+        incoming().senderId == existing().senderId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+
+      allow delete: if isValidId(notificationId) && (isOwner(existing().recipientId) || isSuperAdmin());
+    }
+
+    // 12. Activity Logs (Staff & Founder Oversight)
+    match /activityLogs/{logId} {
+      allow get: if isValidId(logId) && isModeratorOrAdmin();
+      allow list: if isModeratorOrAdmin();
+
+      allow create: if isValidId(logId) &&
+        isModeratorOrAdmin() &&
+        isValidActivityLog(incoming(), logId) &&
+        incoming().actorId == request.auth.uid &&
+        incoming().createdAt == request.time;
+    }
+
+    // 13. Confidential Staff Coordination Chat
+    match /staffMessages/{messageId} {
+      allow get: if isValidId(messageId) && isModeratorOrAdmin();
+      allow list: if isModeratorOrAdmin();
+
+      allow create: if isValidId(messageId) &&
+        isModeratorOrAdmin() &&
+        isValidStaffMessage(incoming(), messageId) &&
+        incoming().senderId == request.auth.uid &&
+        incoming().edited == false &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(messageId) &&
+        isModeratorOrAdmin() &&
+        isValidStaffMessage(incoming(), messageId) &&
+        incoming().id == existing().id &&
+        incoming().senderId == existing().senderId &&
+        incoming().senderRole == existing().senderRole &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isSuperAdmin() ||
+          (
+            isOwner(existing().senderId) &&
+            incoming().edited == true &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['text', 'edited', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(messageId) && isModeratorOrAdmin() && (isSuperAdmin() || isOwner(existing().senderId));
+    }
+
+    // 14. Moderator Onboarding Guidelines (Readable by Staff, Managed Exclusively by Founder)
+    match /staffGuidelines/{guidelineId} {
+      allow get: if isValidId(guidelineId) && isModeratorOrAdmin();
+      allow list: if isModeratorOrAdmin();
+
+      allow create: if isValidId(guidelineId) &&
+        isSuperAdmin() &&
+        isValidStaffGuideline(incoming(), guidelineId) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(guidelineId) &&
+        isSuperAdmin() &&
+        isValidStaffGuideline(incoming(), guidelineId) &&
+        incoming().id == existing().id &&
+        incoming().authorId == existing().authorId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'content', 'updatedAt']);
+
+      allow delete: if isValidId(guidelineId) && isSuperAdmin();
+    }
+
+    // 15. Aurelius Look of the Season Votes
+    match /seasonVotes/{voteId} {
+      allow get: if isValidId(voteId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.seasonKey is string;
+
+      allow create: if isValidId(voteId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidSeasonVote(incoming(), voteId) &&
+        incoming().voterId == request.auth.uid &&
+        voteId == (incoming().seasonKey + '_' + request.auth.uid) &&
+        (isSuperAdmin() || isSeasonVotingActive(incoming().seasonKey)) &&
+        exists(/databases/$(database)/documents/gallery/$(incoming().galleryItemId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(voteId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidSeasonVote(incoming(), voteId) &&
+        existing().voterId == request.auth.uid &&
+        incoming().id == existing().id &&
+        incoming().voterId == existing().voterId &&
+        incoming().seasonKey == existing().seasonKey &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (isSuperAdmin() || isSeasonVotingActive(existing().seasonKey)) &&
+        exists(/databases/$(database)/documents/gallery/$(incoming().galleryItemId)) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['galleryItemId', 'barberId', 'updatedAt']);
+
+      allow delete: if isValidId(voteId) && isVerifiedEmail() &&
+        (isSuperAdmin() || (isNotBanned() && existing().voterId == request.auth.uid && isSeasonVotingActive(existing().seasonKey)));
+    }
+
+    // 16. Aurelius Look of the Season Champion Awards
+    match /seasonAwards/{seasonKey} {
+      allow get: if isValidId(seasonKey) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.seasonKey is string;
+
+      allow create: if isValidId(seasonKey) &&
+        isSuperAdmin() &&
+        isValidSeasonAward(incoming(), seasonKey) &&
+        incoming().awardedById == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(seasonKey) &&
+        isSuperAdmin() &&
+        isValidSeasonAward(incoming(), seasonKey) &&
+        incoming().id == existing().id &&
+        incoming().seasonKey == existing().seasonKey &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isValidId(seasonKey) && isSuperAdmin();
+    }
+
+    // 16b. Look of the Season Configuration
+    match /seasonConfig/{configId} {
+      allow get: if isValidId(configId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail();
+
+      allow create: if isValidId(configId) &&
+        configId == 'current' &&
+        isSuperAdmin() &&
+        isValidSeasonConfig(incoming(), configId) &&
+        incoming().updatedById == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(configId) &&
+        configId == 'current' &&
+        isSuperAdmin() &&
+        isValidSeasonConfig(incoming(), configId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedById == request.auth.uid &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isValidId(configId) && isSuperAdmin();
+    }
+
+    // 17. Aurelius Stories (24-Hour Ephemeral Updates)
+    match /stories/{storyId} {
+      allow get: if isValidId(storyId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.visibility == 'public';
+
+      allow create: if isValidId(storyId) &&
+        canPublishStory() &&
+        isValidBarberStory(incoming(), storyId) &&
+        (incoming().barberId == request.auth.uid || isSuperAdmin()) &&
+        incoming().createdAt == request.time &&
+        incoming().expiresAt > request.time &&
+        incoming().expiresAt <= request.time + duration.value(25, 'h');
+
+      allow delete: if isValidId(storyId) && (isSuperAdmin() || isModeratorOrAdmin() || isOwner(existing().barberId));
+    }
+
+    // 17b. Aurelius Story Quick Reactions
+    match /storyReactions/{reactionId} {
+      allow get: if isValidId(reactionId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.storyAuthorId == request.auth.uid ||
+        resource.data.storyId is string
+      );
+
+      allow create: if isValidId(reactionId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidStoryReaction(incoming(), reactionId) &&
+        incoming().userId == request.auth.uid &&
+        (
+          reactionId == (incoming().storyId + '_' + request.auth.uid) ||
+          ('emojiKey' in incoming() && reactionId == (incoming().storyId + '_' + request.auth.uid + '_' + incoming().emojiKey))
+        ) &&
+        exists(/databases/$(database)/documents/stories/$(incoming().storyId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(reactionId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidStoryReaction(incoming(), reactionId) &&
+        existing().userId == request.auth.uid &&
+        incoming().id == existing().id &&
+        incoming().storyId == existing().storyId &&
+        incoming().storyAuthorId == existing().storyAuthorId &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['reaction', 'emojiKey', 'userName', 'userPhoto', 'updatedAt']);
+
+      allow delete: if isValidId(reactionId) && isVerifiedEmail() &&
+        (
+          isSuperAdmin() ||
+          isModeratorOrAdmin() ||
+          (isNotBanned() && (existing().userId == request.auth.uid || existing().storyAuthorId == request.auth.uid))
+        );
+    }
+
+    // 18. Platform Coming Soon & Dev Log Announcements
+    match /platformAnnouncements/{announcementId} {
+      allow get: if isValidId(announcementId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.visibility == 'public';
+
+      allow create: if isValidId(announcementId) &&
+        isSuperAdmin() &&
+        isValidPlatformAnnouncement(incoming(), announcementId) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(announcementId) &&
+        isSuperAdmin() &&
+        isValidPlatformAnnouncement(incoming(), announcementId) &&
+        incoming().id == existing().id &&
+        incoming().authorId == existing().authorId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'summary', 'badge', 'targetWindow', 'isPinned', 'updatedAt'
+        ]);
+
+      allow delete: if isValidId(announcementId) && isSuperAdmin();
+    }
+
+    // 19. Member Friendships & Friend Requests
+    match /friendships/{friendshipId} {
+      allow get: if isValidId(friendshipId) && isVerifiedEmail() &&
+        (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid);
+      allow list: if isVerifiedEmail() &&
+        (resource.data.user1Id == request.auth.uid || resource.data.user2Id == request.auth.uid);
+
+      allow create: if isValidId(friendshipId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidFriendship(incoming(), friendshipId) &&
+        incoming().requesterId == request.auth.uid &&
+        incoming().status == 'pending' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        userExists(incoming().recipientId) &&
+        (
+          !('friendRequestPolicy' in getUserData(incoming().recipientId)) ||
+          getUserData(incoming().recipientId).friendRequestPolicy == 'everyone' ||
+          (getUserData(incoming().recipientId).friendRequestPolicy == 'barbers_only' && isAnyBarberOrAdmin())
+        );
+
+      allow update: if isValidId(friendshipId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidFriendship(incoming(), friendshipId) &&
+        existing().status == 'pending' &&
+        incoming().status == 'accepted' &&
+        existing().recipientId == request.auth.uid &&
+        incoming().id == existing().id &&
+        incoming().user1Id == existing().user1Id &&
+        incoming().user2Id == existing().user2Id &&
+        incoming().requesterId == existing().requesterId &&
+        incoming().recipientId == existing().recipientId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if isValidId(friendshipId) && isVerifiedEmail() &&
+        (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid || isSuperAdmin());
+    }
+
+    // 20. Live Community Typing Indicators
+    match /typingStatuses/{typingId} {
+      allow get: if isValidId(typingId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail() && resource.data.scope in ['global', 'local'];
+
+      allow create, update: if isValidId(typingId) &&
+        isVerifiedEmail() &&
+        isNotMutedOrKicked() &&
+        isValidTypingStatus(incoming(), typingId) &&
+        incoming().userId == request.auth.uid &&
+        typingId == (incoming().roomKey + '_' + request.auth.uid) &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isValidId(typingId) && isVerifiedEmail() &&
+        (existing().userId == request.auth.uid || isSuperAdmin());
+    }
+
+    // 21. Dynamic Role Definitions (Founder Only Write, Members Read)
+    match /roleDefinitions/{roleId} {
+      allow get: if isValidRoleId(roleId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail();
+
+      allow create: if isValidRoleId(roleId) &&
+        roleId != 'admin' &&
+        isSuperAdmin() &&
+        isValidRoleDefinition(incoming(), roleId) &&
+        incoming().createdById == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidRoleId(roleId) &&
+        roleId != 'admin' &&
+        isSuperAdmin() &&
+        isValidRoleDefinition(incoming(), roleId) &&
+        incoming().id == existing().id &&
+        incoming().createdById == existing().createdById &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isValidRoleId(roleId) && roleId != 'admin' && isSuperAdmin();
+    }
+
+    // 22. Global Temporary Store & Credits Configuration (Founder Only Write, Members Read)
+    match /storeConfig/{configId} {
+      allow get: if isValidId(configId) && isVerifiedEmail();
+      allow list: if isVerifiedEmail();
+
+      allow create: if isValidId(configId) &&
+        configId == 'current' &&
+        isSuperAdmin() &&
+        isValidStoreConfig(incoming(), configId) &&
+        incoming().updatedById == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(configId) &&
+        configId == 'current' &&
+        isSuperAdmin() &&
+        isValidStoreConfig(incoming(), configId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedById == request.auth.uid &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isValidId(configId) && isSuperAdmin();
+    }
+
+    // 23. User-Submitted Safety & Moderation Content Reports
+    match /contentReports/{reportId} {
+      allow get: if isValidId(reportId) && isVerifiedEmail() &&
+        (existing().reporterId == request.auth.uid || isStaffMember());
+      allow list: if isStaffMember() ||
+        (isVerifiedEmail() && resource.data.reporterId == request.auth.uid);
+
+      allow create: if isValidId(reportId) &&
+        isVerifiedEmail() &&
+        isNotBanned() &&
+        isValidContentReport(incoming(), reportId) &&
+        incoming().reporterId == request.auth.uid &&
+        incoming().targetOwnerId != request.auth.uid &&
+        incoming().status == 'pending' &&
+        !('reviewedById' in incoming()) &&
+        !('reviewedByName' in incoming()) &&
+        !('resolutionNote' in incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(reportId) &&
+        isStaffMember() &&
+        isValidContentReport(incoming(), reportId) &&
+        incoming().id == existing().id &&
+        incoming().reporterId == existing().reporterId &&
+        incoming().targetType == existing().targetType &&
+        incoming().targetId == existing().targetId &&
+        incoming().targetOwnerId == existing().targetOwnerId &&
+        incoming().category == existing().category &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().status in ['pending', 'reviewed', 'dismissed'] &&
+        incoming().reviewedById == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'reviewedById', 'reviewedByName', 'resolutionNote', 'updatedAt'
+        ]);
+
+      allow delete: if isValidId(reportId) && isSuperAdmin();
+    }
+  }
+}
