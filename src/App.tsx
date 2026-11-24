@@ -54,7 +54,7 @@ import {
   UserProfile,
   VerificationRequest,
 } from './types';
-import { playNotificationChime } from './utils/audio';
+import { playNotificationChime } from './utils/sound';
 import { isBarberMember, isStaffMember, setDynamicRoleDefinitions } from './utils/roles';
 import {
   MAX_TEXT_LENGTHS,
@@ -72,7 +72,7 @@ import {
   acceptFriendRequest,
   rejectOrRemoveFriendship,
   sendFriendRequest,
-} from './utils/friends';
+} from './utils/friendships';
 import { ReportContentModal, ReportRequestPayload } from './components/ReportContentModal';
 import { PrivacyAndPolicyModal } from './components/PrivacyAndPolicyModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
