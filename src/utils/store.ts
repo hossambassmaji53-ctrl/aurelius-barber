@@ -19,7 +19,8 @@ import {
   StoreFeatureKey,
   UserProfile,
 } from '../types';
-import { getTodayDateKey } from './gamification';
+const getTodayDateKey = (..._args: unknown[]) => '';
+
 import { assertFounderActor, hasRole, isFounderUser } from './roles';
 import { sanitizeHandleInput, sanitizePlainText } from './security';
 const getUserHandle = (..._args: unknown[]) => ''; const isValidUsername = (..._args: unknown[]) => true;
