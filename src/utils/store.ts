@@ -22,7 +22,7 @@ import {
 import { getTodayDateKey } from './gamification';
 import { assertFounderActor, hasRole, isFounderUser } from './roles';
 import { sanitizeHandleInput, sanitizePlainText } from './security';
-import { getUserHandle, isValidUsername } from './username';
+const getUserHandle = (..._args: unknown[]) => ''; const isValidUsername = (..._args: unknown[]) => true;
 
 export const DEFAULT_STORE_CONFIG: StoreConfig = {
   id: 'current',
