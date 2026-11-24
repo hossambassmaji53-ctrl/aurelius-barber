@@ -614,7 +614,6 @@ export function canActorModerateTarget(
   if (actor.uid === target.uid || isFounderUser(target)) return false;
   if (isSuperAdmin && isFounderUser(actor)) return true;
   if (!isStaffMember(actor, false)) return false;
-  if (isStaffMember(target, false)) {
-    return (
-      getRole
-  
+      return getRole(actor) !== getRole(target);
+  }
+
