@@ -1,0 +1,718 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public profile, live status, Aurelius Credits, temporary Store perks, and dynamic role state for a platform member.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "username": { "type": "string", "minLength": 1, "maxLength": 24, "pattern": "^[a-z0-9_]{1,24}$" },
+        "baseUsername": { "type": "string", "minLength": 1, "maxLength": 24, "pattern": "^[a-z0-9_]{1,24}$" },
+        "isSpecialId": { "type": "boolean" },
+        "specialIdLabel": { "type": "string", "maxLength": 40 },
+        "specialIdExpiresAt": { "type": "string", "format": "date-time" },
+        "specialIdGrantedBy": { "type": "string", "maxLength": 40 },
+        "nameColor": { "type": "string", "maxLength": 40 },
+        "nameColorExpiresAt": { "type": "string", "format": "date-time" },
+        "avatarFrame": { "type": "string", "maxLength": 40 },
+        "avatarFrameExpiresAt": { "type": "string", "format": "date-time" },
+        "chatTitle": { "type": "string", "maxLength": 40 },
+        "chatTitleExpiresAt": { "type": "string", "format": "date-time" },
+        "creditPassTier": { "type": "string", "maxLength": 40 },
+        "creditPassExpiresAt": { "type": "string", "format": "date-time" },
+        "lastDailyClaimDate": { "type": "string", "maxLength": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "photoURL": { "type": "string", "maxLength": 350000 },
+        "coverURL": { "type": "string", "maxLength": 350000 },
+        "bio": { "type": "string", "maxLength": 400 },
+        "role": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "roles": { "type": "array", "description": "Optional multi-role array assigned manually by Super Admin." },
+        "availability": { "type": "string", "enum": ["available", "busy"] },
+        "liveStatus": { "type": "string", "enum": ["online", "cutting", "offline"] },
+        "points": { "type": "integer", "description": "Aurelius Credits balance earned from daily login, chat, engagement, bookings, and admin grants." },
+        "completedBookingsCount": { "type": "integer", "description": "Count of completed barber appointments." },
+        "salonName": { "type": "string", "maxLength": 100 },
+        "addressLabel": { "type": "string", "maxLength": 160 },
+        "location": { "type": "object" },
+        "services": { "type": "array" },
+        "canPostStory": { "type": "boolean", "description": "Manual permission granted by Super Admin to publish 24h Aurelius Stories." },
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 2, "pattern": "^[A-Z]{2}$" },
+        "friendRequestPolicy": { "type": "string", "enum": ["everyone", "barbers_only", "nobody"] },
+        "hideOnlineStatus": { "type": "boolean" },
+        "isOnline": { "type": "boolean" },
+        "lastActiveAt": { "type": "string", "format": "date-time" },
+        "isMuted": { "type": "boolean" },
+        "muteReason": { "type": "string", "maxLength": 240 },
+        "isKicked": { "type": "boolean" },
+        "kickReason": { "type": "string", "maxLength": 240 },
+        "isBanned": { "type": "boolean" },
+        "banReason": { "type": "string", "maxLength": 240 },
+        "isPublicProfile": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "availability", "isMuted", "isKicked", "isBanned", "isPublicProfile", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII document storing user email address.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "VerificationRequest": {
+      "title": "VerificationRequest",
+      "description": "Request submitted by a barber user to obtain the verified barber rank from the Super Admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "userPhoto": { "type": "string", "maxLength": 350000 },
+        "salonName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 2, "pattern": "^[A-Z]{2}$" },
+        "city": { "type": "string", "maxLength": 80 },
+        "experience": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "phoneOrSocial": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "adminNote": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "salonName", "experience", "status", "createdAt", "updatedAt"]
+    },
+    "GalleryItem": {
+      "title": "GalleryItem",
+      "description": "Haircut and grooming portfolio item published exclusively by a VIP Barber (or Super Admin).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "barberPhoto": { "type": "string", "maxLength": 350000 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "enum": ["fade", "beard", "classic", "styling", "vip"] },
+        "imageUrl": { "type": "string", "minLength": 1, "maxLength": 400000 },
+        "isBeforeAfter": { "type": "boolean" },
+        "beforeImageUrl": { "type": "string", "maxLength": 400000 },
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 2, "pattern": "^[A-Z]{2}$" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "barberId", "barberName", "title", "category", "imageUrl", "visibility", "createdAt", "updatedAt"]
+    },
+    "LikeRecord": {
+      "title": "LikeRecord",
+      "description": "Individual user like on either a verified barber profile as a whole or a specific gallery/portfolio work item.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetType": { "type": "string", "enum": ["profile", "gallery"] },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "targetType", "targetId", "userId", "createdAt"]
+    },
+    "SeasonVote": {
+      "title": "SeasonVote",
+      "description": "Monthly vote cast by a verified member for their favorite VIP Barber cut in Aurelius Look of the Season.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "seasonKey": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{2,40}$", "maxLength": 40 },
+        "galleryItemId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "voterId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "seasonKey", "galleryItemId", "barberId", "voterId", "createdAt", "updatedAt"]
+    },
+    "SeasonAward": {
+      "title": "SeasonAward",
+      "description": "Official Look of the Season gold medal award granted to the highest-voted VIP Barber.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{2,40}$", "maxLength": 40 },
+        "seasonKey": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{2,40}$", "maxLength": 40 },
+        "seasonLabel": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "barberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "barberPhoto": { "type": "string", "maxLength": 350000 },
+        "galleryItemId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "galleryItemTitle": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "galleryItemImageUrl": { "type": "string", "minLength": 1, "maxLength": 400000 },
+        "votesCount": { "type": "integer" },
+        "awardedById": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "seasonKey", "seasonLabel", "barberId", "barberName", "galleryItemId", "galleryItemTitle", "galleryItemImageUrl", "votesCount", "awardedById", "createdAt", "updatedAt"]
+    },
+    "SeasonConfig": {
+      "title": "SeasonConfig",
+      "description": "Manual Super Admin configuration controlling Look of the Season visibility, active voting status, round key, and custom titles.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "enum": ["current"] },
+        "isHidden": { "type": "boolean" },
+        "isVotingOpen": { "type": "boolean" },
+        "activeSeasonKey": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{2,40}$", "maxLength": 40 },
+        "activeSeasonLabel": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "contestHeadline": { "type": "string", "maxLength": 140 },
+        "contestSubtitle": { "type": "string", "maxLength": 500 },
+        "updatedById": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "isHidden", "isVotingOpen", "activeSeasonKey", "activeSeasonLabel", "updatedById", "createdAt", "updatedAt"]
+    },
+    "BarberStory": {
+      "title": "BarberStory",
+      "description": "Ephemeral 24-hour photo, before-and-after, or short video update published by a verified or VIP barber.",
+            "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "barberPhoto": { "type": "string", "maxLength": 350000 },
+        "salonName": { "type": "string", "maxLength": 100 },
+        "mediaType": { "type": "string", "enum": ["image", "before_after", "video"] },
+        "mediaUrl": { "type": "string", "minLength": 1, "maxLength": 750000 },
+        "beforeMediaUrl": { "type": "string", "maxLength": 360000 },
+        "caption": { "type": "string", "maxLength": 200 },
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 2, "pattern": "^[A-Z]{2}$" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "barberId", "barberName", "mediaType", "mediaUrl", "visibility", "expiresAt", "createdAt"]
+    },
+    "StoryReaction": {
+      "title": "StoryReaction",
+      "description": "Quick reaction on an active 24-hour Aurelius Story.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storyId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storyAuthorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "userPhoto": { "type": "string", "maxLength": 350000 },
+        "reaction": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "emojiKey": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9_]{1,64}$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "storyId", "storyAuthorId", "userId", "userName", "reaction", "createdAt", "updatedAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Confidential support complaint or ticket opened by a user for moderators and overseen by the Super Admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "userPhoto": { "type": "string", "maxLength": 350000 },
+        "userRole": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "subject": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "category": { "type": "string", "enum": ["complaint", "report_user", "technical", "inquiry"] },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "status": { "type": "string", "enum": ["open", "in_progress", "closed"] },
+        "assignedModeratorId": { "type": "string", "maxLength": 128 },
+        "assignedModeratorName": { "type": "string", "maxLength": 80 },
+        "resolutionNote": { "type": "string", "maxLength": 400 },
+        "lastMessage": { "type": "string", "maxLength": 300 },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "userName", "userRole", "subject", "category", "description", "status", "lastMessage", "lastMessageAt", "createdAt", "updatedAt"]
+    },
+    "SupportTicketMessage": {
+      "title": "SupportTicketMessage",
+      "description": "Confidential reply message inside a support ticket.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "senderPhoto": { "type": "string", "maxLength": 350000 },
+        "senderRole": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ticketId", "ticketOwnerId", "senderId", "senderName", "senderRole", "text", "createdAt"]
+    },
+    "CommunityMessage": {
+      "title": "CommunityMessage",
+      "description": "Live public community chat message.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "senderUsername": { "type": "string", "minLength": 1, "maxLength": 24, "pattern": "^[a-z0-9_]{1,24}$" },
+        "senderPhoto": { "type": "string", "maxLength": 350000 },
+        "senderRole": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "replyToId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "replyToSenderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "replyToSenderName": { "type": "string", "maxLength": 80 },
+        "replyToSenderUsername": { "type": "string", "maxLength": 24 },
+        "replyToText": { "type": "string", "maxLength": 200 },
+        "mentions": { "type": "array", "description": "Up to 10 user UIDs mentioned with @username in this message." },
+        "edited": { "type": "boolean" },
+        "roomType": { "type": "string", "enum": ["global", "local"], "description": "Chat room scope: worldwide global chat or country-specific local chat." },
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 2, "pattern": "^[A-Z]{2}$" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "senderId", "senderName", "senderRole", "text", "edited", "visibility", "createdAt", "updatedAt"]
+    },
+    "ProfilePost": {
+      "title": "ProfilePost",
+      "description": "Personal status post published on a member's profile timeline.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "authorPhoto": { "type": "string", "maxLength": 350000 },
+        "authorRole": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "imageUrl": { "type": "string", "maxLength": 450000 },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "authorName", "authorRole", "text", "visibility", "createdAt", "updatedAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Private 1-on-1 chat thread between two members.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant1Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant2Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant1Name": { "type": "string", "maxLength": 80 },
+        "participant2Name": { "type": "string", "maxLength": 80 },
+        "participant1Photo": { "type": "string", "maxLength": 350000 },
+        "participant2Photo": { "type": "string", "maxLength": 350000 },
+        "lastMessage": { "type": "string", "maxLength": 300 },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "participant1Id", "participant2Id", "participant1Name", "participant2Name", "lastMessage", "lastMessageAt", "createdAt", "updatedAt"]
+    },
+    "PrivateMessage": {
+      "title": "PrivateMessage",
+      "description": "Message within a private conversation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "conversationId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant1Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant2Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "bookingId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "conversationId", "participant1Id", "participant2Id", "senderId", "senderName", "text", "createdAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Appointment reservation between a customer and a verified barber.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "conversationId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "customerPhoto": { "type": "string", "maxLength": 350000 },
+        "barberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "barberPhoto": { "type": "string", "maxLength": 350000 },
+        "serviceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "serviceName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "servicePrice": { "type": "number" },
+        "serviceDuration": { "type": "number" },
+        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "maxLength": 10 },
+        "time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$", "maxLength": 5 },
+        "notes": { "type": "string", "maxLength": 400 },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "rescheduled", "rejected", "completed", "cancelled"] },
+        "reviewed": { "type": "boolean" },
+                "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "conversationId", "customerId", "customerName", "barberId", "barberName", "serviceId", "serviceName", "servicePrice", "serviceDuration", "date", "time", "status", "reviewed", "createdAt", "updatedAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Star rating and review written by a customer after a completed appointment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "bookingId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barberId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "customerPhoto": { "type": "string", "maxLength": 350000 },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "bookingId", "barberId", "customerId", "customerName", "rating", "comment", "visibility", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Real-time notification sent to a specific user for messages, bookings, tickets, verification requests, or moderation updates.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "type": { "type": "string", "enum": ["message", "booking_new", "booking_update", "role_update", "moderation", "verification_request", "ticket_new", "ticket_update", "announcement", "story_reaction", "story_reply", "friend_request", "friend_accept", "credit_grant", "store_purchase"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "targetView": { "type": "string", "enum": ["private_chat", "appointments", "community", "profile", "admin", "tickets", "staff_room", "season", "leaderboard", "about", "stories", "store"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "recipientId", "senderId", "senderName", "type", "title", "body", "targetView", "targetId", "read", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Audit log of admin and moderator actions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "action": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "targetUserId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetUserName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "reason": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actorId", "actorName", "action", "targetUserId", "targetUserName", "createdAt"]
+    },
+    "StaffMessage": {
+      "title": "StaffMessage",
+      "description": "Confidential internal chat message visible strictly to moderators, deputy directors, and the Founder.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "senderPhoto": { "type": "string", "maxLength": 350000 },
+        "senderRole": { "type": "string", "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "edited": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "senderId", "senderName", "senderRole", "text", "edited", "createdAt", "updatedAt"]
+    },
+    "StaffGuideline": {
+      "title": "StaffGuideline",
+      "description": "Moderator onboarding rule or directive authored by the Super Admin for the Admin & Moderators Room.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "category": { "type": "string", "enum": ["duties", "rules", "tickets", "escalation"] },
+        "content": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "authorName", "title", "category", "content", "createdAt", "updatedAt"]
+    },
+    "PlatformAnnouncement": {
+      "title": "PlatformAnnouncement",
+      "description": "Coming soon news and official platform update announcement published by the Super Admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "badge": { "type": "string", "enum": ["coming_soon", "in_development", "major_update", "new_feature"] },
+        "targetWindow": { "type": "string", "maxLength": 60 },
+        "isPinned": { "type": "boolean" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "authorName", "title", "summary", "badge", "isPinned", "visibility", "createdAt", "updatedAt"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "Friend request or accepted friendship connection between two members.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user1Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user2Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "requesterId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "requesterName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "requesterPhoto": { "type": "string", "maxLength": 350000 },
+        "recipientName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "recipientPhoto": { "type": "string", "maxLength": 350000 },
+        "status": { "type": "string", "enum": ["pending", "accepted"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user1Id", "user2Id", "requesterId", "recipientId", "requesterName", "recipientName", "status", "createdAt", "updatedAt"]
+    },
+    "TypingStatus": {
+      "title": "TypingStatus",
+      "description": "Ephemeral live typing indicator for global and local community chat rooms.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "scope": { "type": "string", "enum": ["global", "local"] },
+        "roomKey": { "type": "string", "minLength": 4, "maxLength": 24, "pattern": "^(global|local_[A-Z]{2})$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "isTyping": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "scope", "roomKey", "userId", "userName", "isTyping", "updatedAt"]
+    },
+    "ConversationTyping": {
+      "title": "ConversationTyping",
+      "description": "Ephemeral live typing indicator within a private 1-on-1 conversation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "conversationId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant1Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participant2Id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "isTyping": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "conversationId", "participant1Id", "participant2Id", "userId", "userName", "isTyping", "updatedAt"]
+    },
+    "RoleDefinition": {
+      "title": "RoleDefinition",
+      "description": "Dynamic or customized role metadata and granular permission flags managed exclusively by the Founder.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]{1,64}$" },
+        "nameAr": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "shortLabelAr": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "descriptionAr": { "type": "string", "maxLength": 240 },
+        "colorKey": { "type": "string", "enum": ["gold", "crimson", "indigo", "teal", "silver", "amber", "emerald", "violet", "slate"] },
+        "hierarchyOrder": { "type": "integer" },
+        "isSystem": { "type": "boolean" },
+        "permissions": { "type": "object" },
+        "createdById": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nameAr", "shortLabelAr", "colorKey", "hierarchyOrder", "permissions", "createdById", "createdAt", "updatedAt"]
+    },
+        "StoreConfig": {
+      "title": "StoreConfig",
+      "description": "Temporary Feature Store pricing, duration, availability, daily login credit reward, and Founder-reserved special IDs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "enum": ["current"] },
+        "dailyRewardCoins": { "type": "integer" },
+        "reservedSpecialIds": { "type": "array" },
+        "items": { "type": "object" },
+        "updatedById": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "dailyRewardCoins", "reservedSpecialIds", "items", "updatedById", "createdAt", "updatedAt"]
+    },
+    "BlockedUser": {
+      "title": "BlockedUser",
+      "description": "User block record stored privately under the blocking member's subcollection.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "blockerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "blockedUserId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "blockedUserName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "blockedUserPhoto": { "type": "string", "maxLength": 350000 },
+        "reason": { "type": "string", "maxLength": 240 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "blockerId", "blockedUserId", "blockedUserName", "createdAt"]
+    },
+    "ContentReport": {
+      "title": "ContentReport",
+      "description": "User-generated content or member safety report submitted for moderation review.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "reporterId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "reporterName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "targetType": { "type": "string", "enum": ["message", "gallery", "story", "profile"] },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetOwnerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "targetPreview": { "type": "string", "maxLength": 180 },
+        "category": { "type": "string", "enum": ["harassment", "spam", "inappropriate", "impersonation", "other"] },
+        "reason": { "type": "string", "maxLength": 400 },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "dismissed"] },
+        "reviewedById": { "type": "string", "maxLength": 128 },
+        "reviewedByName": { "type": "string", "maxLength": 80 },
+        "resolutionNote": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reporterId", "reporterName", "targetType", "targetId", "targetOwnerId", "targetOwnerName", "category", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Public user profiles, live presence/status, Aurelius Coins points, and verified barber directories."
+    },
+    "/users/{userId}/private/info": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII document storing the user's email address."
+    },
+    "/verificationRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/VerificationRequest" },
+      "description": "Barber verification requests reviewed exclusively by the Super Admin."
+    },
+    "/gallery/{itemId}": {
+      "schema": { "$ref": "#/entities/GalleryItem" },
+      "description": "Verified VIP Barber work showcase gallery items, including before-and-after pairs."
+    },
+    "/likes/{likeId}": {
+      "schema": { "$ref": "#/entities/LikeRecord" },
+      "description": "Per-user likes on barber profiles and individual gallery works."
+    },
+    "/seasonVotes/{voteId}": {
+      "schema": { "$ref": "#/entities/SeasonVote" },
+      "description": "Monthly Aurelius Look of the Season member votes on VIP Barber cuts."
+    },
+    "/seasonAwards/{seasonKey}": {
+      "schema": { "$ref": "#/entities/SeasonAward" },
+      "description": "Look of the Season gold medal awards for winning VIP Barbers."
+    },
+    "/seasonConfig/{configId}": {
+      "schema": { "$ref": "#/entities/SeasonConfig" },
+      "description": "Super Admin configuration for Look of the Season visibility, manual round activation, and titles."
+    },
+    "/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/BarberStory" },
+      "description": "24-hour ephemeral stories posted by members granted manual story publishing permission or Super Admin."
+    },
+    "/storyReactions/{reactionId}": {
+      "schema": { "$ref": "#/entities/StoryReaction" },
+      "description": "Quick reactions on active 24-hour Aurelius Stories."
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Confidential support complaints and tickets handled by moderators and overseen by the Super Admin."
+    },
+    "/supportTickets/{ticketId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/SupportTicketMessage" },
+      "description": "Confidential replies inside a support ticket."
+    },
+    "/communityMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/CommunityMessage" },
+      "description": "Public community chat messages."
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/ProfilePost" },
+      "description": "User profile status posts."
+    },
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Private 1-on-1 conversations between members."
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/PrivateMessage" },
+      "description": "Messages inside a private conversation."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Appointment reservations between customers and verified barbers."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Customer reviews and star ratings for completed bookings."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Real-time user notifications."
+    },
+    "/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Admin and moderator audit activity logs."
+    },
+    "/staffMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/StaffMessage" },
+      "description": "Confidential Admin & Moderators Room chat messages."
+    },
+    "/staffGuidelines/{guidelineId}": {
+      "schema": { "$ref": "#/entities/StaffGuideline" },
+      "description": "Moderator onboarding rules and directives managed by the Super Admin."
+    },
+    "/platformAnnouncements/{announcementId}": {
+      "schema": { "$ref": "#/entities/PlatformAnnouncement" },
+      "description": "Official upcoming feature news and Coming Soon dev log announcements managed by the Super Admin."
+    },
+    "/friendships/{friendshipId}": {
+      "schema": { "$ref": "#/entities/Friendship" },
+      "description": "Friend requests and accepted friendships between platform members."
+    },
+    "/typingStatuses/{typingId}": {
+      "schema": { "$ref": "#/entities/TypingStatus" },
+      "description": "Real-time typing presence indicators for Global Chat and Local Country Chats."
+    },
+    "/conversations/{conversationId}/typing/{userId}": {
+      "schema": { "$ref": "#/entities/ConversationTyping" },
+      "description": "Real-time typing indicator inside a private 1-on-1 conversation."
+    },
+    "/roleDefinitions/{roleId}": {
+      "schema": { "$ref": "#/entities/RoleDefinition" },
+      "description": "Custom and overridden platform role definitions and granular permissions managed by the Founder."
+    },
+    "/storeConfig/{configId}": {
+      "schema": { "$ref": "#/entities/StoreConfig" },
+      "description": "Global Temporary Store configuration, credit rewards, and reserved IDs managed by the Founder."
+    },
+    "/users/{userId}/blockedUsers/{blockedUid}": {
+      "schema": { "$ref": "#/entities/BlockedUser" },
+      "description": "Private list of blocked members owned strictly by each user."
+    },
+    "/contentReports/{reportId}": {
+      "schema": { "$ref": "#/entities/ContentReport" },
+      "description": "User-submitted safety and UGC moderation reports reviewed by staff."
+    }
+  }
+}
