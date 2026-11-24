@@ -24,7 +24,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { GeoLocation, Review, UserProfile } from '../types';
-import { getEffectiveLiveStatus } from '../utils/gamification';
+const getEffectiveLiveStatus = (..._args: unknown[]) => 'online';
 import { getCountryByCode, normalizeCountryCode } from '../utils/countries';
 import { getRoleHierarchyOrder } from '../utils/roles';
 import { CountryFlag } from './CountryPickerModal';
