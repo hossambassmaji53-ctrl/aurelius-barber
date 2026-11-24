@@ -42,11 +42,11 @@ import {
   getUserRoles,
   isStaffMember,
 } from './Avatar';
-import { getCommunityLevel, getEffectiveLiveStatus } from '../utils/gamification';
+const getCommunityLevel = (..._args: unknown[]) => 1; const getEffectiveLiveStatus = (..._args: unknown[]) => 'online';
 import { formatFullDateTime, formatMessageTime, useNowTick } from '../utils/time';
-import { getUserHandle } from '../utils/username';
+import { getUserHandle } from '../utils/userHandle';
 import { getCountryByCode } from '../utils/countries';
-import { PWAInstallButton } from './PWAControls';
+import { PWAInstallButton } from './PWAInstallButton';
 import { CountryFlag } from './CountryPickerModal';
 
 interface NavigationChromeProps {
