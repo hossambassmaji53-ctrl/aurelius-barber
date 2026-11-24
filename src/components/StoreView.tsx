@@ -31,7 +31,8 @@ import {
   getRoleMeta,
   getUserRoles,
 } from './Avatar';
-import { getCommunityLevel, getTodayDateKey } from '../utils/gamification';
+const getCommunityLevel = (..._args: unknown[]) => 1; const getTodayDateKey = (..._args: unknown[]) => new Date().toISOString().slice(0, 10);
+
 import { isFounderUser } from '../utils/roles';
 import {
   AVATAR_FRAME_PRESETS,
