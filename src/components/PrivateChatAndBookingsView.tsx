@@ -1622,7 +1622,8 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                         }}
                         title="حذف المحادثة للطرفين"
                         aria-label={`حذف محادثة ${otherName}`}
-                        className="min-w-[36px] min-h-[36px] rounded-xl text-[#7B766E] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors cursor-pointer"
+                                          className="min-h-[30px] min-w-[30px] rounded-xl text-[#f87066] hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors cursor-pointer"
+10 flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
