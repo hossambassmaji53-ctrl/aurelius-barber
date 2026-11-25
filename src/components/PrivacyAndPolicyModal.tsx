@@ -209,6 +209,11 @@ export const PrivacyAndPolicyModal: React.FC<PrivacyAndPolicyModalProps> = ({
                 </p>
               </section>
 
-              <section className="space-y-1.5">
+                            <section className="space-y-1.5">
+                <p className="text-xs text-[#A8B0C7] leading-relaxed">
+                  يتم تحديث سياسة الخصوصية والبيانات عند الحاجة لضمان وضوح الإجراءات وحماية الحسابات.
+                </p>
+              </section>
+              
                 
               
