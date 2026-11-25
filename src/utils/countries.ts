@@ -387,9 +387,24 @@ export function clearCountryScopedCaches(): void {
     // Ignore storage errors
   }
 }
-
 export function matchesActiveCountry(
   itemCountryCode: string | undefined,
   authorCountryCode: string | undefined,
-  activeCountryCode: string
   
+  activeCountryCode: string
+): boolean {
+  const normalizedActive = normalizeCountryCode(activeCountryCode);
+  if (!normalizedActive) return true;
+
+  const normalizedItem = normalizeCountryCode(itemCountryCode);
+  if (normalizedItem) {
+    return normalizedItem === normalizedActive;
+  }
+
+  const normalizedAuthor = normalizeCountryCode(authorCountryCode);
+  if (normalizedAuthor) {
+    return normalizedAuthor === normalizedActive;
+  }
+
+  return true;
+}
