@@ -209,5 +209,6 @@ export const PrivacyAndPolicyModal: React.FC<PrivacyAndPolicyModalProps> = ({
                 </p>
               </section>
 
-              <section className="space-
+              <section className="space-y-1.5">
+                
               
