@@ -2435,7 +2435,8 @@ export const CommunityChatView: React.FC<CommunityChatViewProps> = ({
                           }}
                           className={`w-full px-3 py-2 flex items-center justify-between gap-2 text-right transition-colors cursor-pointer ${
                             isSelected ? 'bg-[#D4A853]/18' : 'hover:bg-[#20202A]'
-                          }`}
+                          }`}>
+     
                       <div className="flex items-center gap-2 min-w-0">
                             <div className="relative shrink-0">
                               <Avatar
