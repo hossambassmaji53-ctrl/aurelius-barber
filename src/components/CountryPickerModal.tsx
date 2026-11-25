@@ -277,7 +277,26 @@ export const CountryPickerModal: React.FC<CountryPickerModalProps> = ({
         </div>
 
         {/* Footer Confirm (Welcome Mode) */}
-        {mode === 'welcome' && (
-              <div className="shrink-0 px-5 sm:px-7 py-4 border-t border-[#222228]">
+              <div className="shrink-0 px-5 sm:px-7 py-4 border-t border-[#222222] flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={saving || !selectedCode}
+                  onClick={() => {
+                    if (selectedCode) {
+                      void handleConfirm(selectedCode);
+                    }
+                  }}
+                  className="min-h-[42px] px-5 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#E5C158] disabled:opacity-50 text-[#080808] text-xs font-extrabold cursor-pointer transition-colors"
+                >
+                  {saving ? 'جاري الحفظ...' : 'متابعة'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
-            
+export default CountryPickerModal;
