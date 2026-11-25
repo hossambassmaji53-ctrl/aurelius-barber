@@ -278,5 +278,6 @@ export const CountryPickerModal: React.FC<CountryPickerModalProps> = ({
 
         {/* Footer Confirm (Welcome Mode) */}
         {mode === 'welcome' && (
-          <div className="shrink-0 px-5 sm:px-7 py-4 border-t border-[#22222B]
+              <div className="shrink-0 px-5 sm:px-7 py-4 border-t border-[#222228]">
+
             
