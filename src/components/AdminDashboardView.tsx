@@ -55,7 +55,7 @@ import {
   UserProfile,
   UserRole,
   VerificationRequest,
-const getUserHandle = (..._args: unknown[]) => ''; const isActiveSpecialId = (..._args: unknown[]) => false; const isValidUserId = (..._args: unknown[]) => true;
+const getUserHandle = (..._args: unknown[]) => ''; const isActiveSpecialId = (..._args: unknown[]) => false; const isValidUserId = (..._args: unknown[]) => true
 
 import {
   Avatar,
