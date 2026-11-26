@@ -1636,8 +1636,7 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                 );
               })
             )}
-          </div>
-        </div>
+          </div>   
       ) : (
         /* Full-Height Edge-to-Edge Active Direct Chat View */
         (() => {
