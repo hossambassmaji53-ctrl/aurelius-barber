@@ -219,3 +219,5 @@ export const PrivacyAndPolicyModal: React.FC<PrivacyAndPolicyModalProps> = ({
     </div>
         };
       }
+
+          
