@@ -214,10 +214,11 @@ export const PrivacyAndPolicyModal: React.FC<PrivacyAndPolicyModalProps> = ({
                   يتم تحديث سياسة الخصوصية والبيانات عند الحاجة لضمان وضوح الإجراءات وحماية الحسابات.
                 </p>
                       </section>
-        ) : null}
-      </div>
+              </section>
+      </>
+      ) : null}
     </div>
-        };
-      }
+  </div>
+);
 
           
