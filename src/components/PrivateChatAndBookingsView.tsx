@@ -1633,8 +1633,6 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
           <ChevronLeft className="w-4 h-4 text-[#8696A0]" />
         </button>
       </div>
-    </div>
-
                 );
               })
             )}
