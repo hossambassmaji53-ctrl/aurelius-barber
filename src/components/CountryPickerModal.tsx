@@ -295,7 +295,7 @@ export const CountryPickerModal: React.FC<CountryPickerModalProps> = ({
           </div>
         </div>
       )}
-    </>
+    
   );
 };
 
