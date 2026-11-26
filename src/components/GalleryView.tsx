@@ -75,10 +75,11 @@ import {
   sanitizePlainText,
 } from '../utils/security';
 import { ReportRequestPayload } from './ReportContentModal';
-import demoFadeImg from '../assets/images/barber_fade_cut_1794853786638.jpg';
-import demoBeardImg from '../assets/images/barber_beard_trim_1794853788143.jpg';
-import demoToolsImg from '../assets/images/barber_tools_flatlay_1794853788003.jpg';
-import demoSalonImg from '../assets/images/barber_hero_salon_1794853787883.jpg';
+const demoFadeImg = '';
+const demoBeardImg = '';
+const demoToolingImg = '';
+const demoSalonImg = '';
+
 
 const DEMO_HIDE_STORAGE_KEY = 'aurelius_hide_demo_gallery_v1';
 
