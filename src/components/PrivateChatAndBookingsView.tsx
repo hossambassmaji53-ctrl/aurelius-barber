@@ -1624,11 +1624,17 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                         aria-label={`حذف محادثة ${otherName}`}
                                           className="min-h-[30px] min-w-[30px] rounded-xl text-[#807066] hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
 
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <ChevronLeft className="w-4 h-4 text-[#6B665E]" />
-                    </div>
-                  </div>
+                                  <Trash2 className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          className="min-h-[30px] min-w-[30px] rounded-xl flex items-center justify-center text-[#8696A0]"
+        >
+          <ChevronLeft className="w-4 h-4 text-[#8696A0]" />
+        </button>
+      </div>
+    </div>
+
                 );
               })
             )}
