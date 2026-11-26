@@ -291,7 +291,7 @@ export const CountryPickerModal: React.FC<CountryPickerModalProps> = ({
                   {saving ? 'جاري الحفظ...' : 'متابعة'}
                 </button>
               </div>
-            )}
+            )
           </div>
         </div>
       )}
