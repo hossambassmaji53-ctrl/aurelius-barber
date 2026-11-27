@@ -296,7 +296,6 @@ export const CountryPickerModal: React.FC<CountryPickerModalProps> = ({
         </div>
       )}
     
-  );
 };
 
 export default CountryPickerModal;
