@@ -217,7 +217,9 @@ export const PrivacyAndPolicyModal: React.FC<PrivacyAndPolicyModalProps> = ({
     </>
   ) : null}
 </div>
-
+</div>
+</div>
 );
+};
 
-          
+export default PrivacyAndPolicyModal;
