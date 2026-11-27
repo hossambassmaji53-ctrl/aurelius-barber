@@ -1639,7 +1639,7 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
           </div>   
       ) : (
         /* Full-Height Edge-to-Edge Active Direct Chat View */
-        (() => {
+        {(() => {
           const other = getOtherParticipant(activeConv);
           const otherId =
             activeConv.participant1Id === currentUser.uid
