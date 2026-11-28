@@ -1935,11 +1935,11 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                           className="p-0.5 text-red-300 hover:text-white cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
-                        </button>                    </div>
-                  ))}
+                                            </div>
+                  )}
                   </div>
                 )}
-                    {isOtherTypingNow && (
+
                       <div className="px-4 sm:px-6 py-1.5 border-b border-[#1E1E26] bg-[#14141B] flex items-center gap-2 text-[11px] text-[#D4A853]">
                         <span className="inline-flex items-center gap-1" aria-hidden="true">
                           <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce" />
