@@ -1945,31 +1945,26 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                         <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce [animation-delay:150ms]" />
                         <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce [animation-delay:300ms]" />
                       </span>
-                      <span className="font-semibold truncate">
+                                            <span className="font-semibold truncate">
                         {otherName} يكتب الآن...
                       </span>
                     </div>
                   )}
+                  <form
+                    onSubmit={handleSendPrivateMessage}
+                    className="px-4 sm:px-6 py-2.5 flex items-center gap-2.5"
+                  >
+                    <input
+                      type="text"
+                      maxLength={1000}
+                      value={msgText}
+                      onChange={handleDmComposerChange}
+                      onBlur={stopDmTypingNow}
+                      placeholder="اكتب رسالة خاصة..."
+                      className="flex-1 min-h-[42px] bg-[#1A1A22] border border-[#2C2C35] focus:border-[#D4A853] rounded-xl px-3.5 py-2 text-sm text-[#F5F2EB] placeholder:text-[#66645E] outline-none"
+                    />
+                    <button
 
-                        type="text"
-                        maxLength={1000}
-                        value={msgText}
-                        onChange={handleDmComposerChange}
-                        onBlur={stopDmTypingNow}
-                        placeholder="اكتب رسالة خاصة..."
-                        className="flex-1 min-h-[42px] bg-[#1A1A22] border border-[#2C2C35] focus:border-[#D4A853] rounded-xl px-4 py-2 text-sm text-[#F5F2EB] placeholder:text-[#6B665E] outline-none"
-                      />
-                      <button
-                        type="submit"
-                        disabled={sending || !msgText.trim()}
-                        className="min-h-[42px] px-4 py-2 rounded-xl bg-[#D4A853] hover:bg-[#E0B96B] text-[#0B0B0E] font-bold text-xs inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer disabled:opacity-50"
-                      >
-                        <span>إرسال</span>
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                    </form>
-                  </div>
-                );
               })()}
             </div>
           );
