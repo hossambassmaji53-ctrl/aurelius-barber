@@ -1668,7 +1668,8 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                     type="button"
                     onClick={onBack || (() => onSelectConversation(null))}
                     aria-label={backLabel ? `العودة إلى ${backLabel}` : 'العودة لقائمة المحادثات'}
-                    }
+aria-label={backLabel ? 'عودة إلى ' + backLabel : 'العودة إلى المحادثات'}
+      
                     title={backLabel ? `العودة إلى ${backLabel}` : 'العودة لقائمة المحادثات'}
                     }
                     className="min-h-[40px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#1A1A22] hover:bg-[#24242F] border border-[#2C2C35] text-xs font-bold text-[#F5F2EB] inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
