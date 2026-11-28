@@ -1664,16 +1664,12 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
               {/* Top Thread Header with Prominent Back Button */}
               <div className="shrink-0 px-3 sm:px-6 py-2.5 border-b border-[#22222B] bg-[#121218] flex items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={onBack || (() => onSelectConversation(null))}
-                    aria-label={backLabel ? `العودة إلى ${backLabel}` : 'العودة لقائمة المحادثات'}
-aria-label={backLabel ? 'عودة إلى ' + backLabel : 'العودة إلى المحادثات'}
-      
-                    title={backLabel ? `العودة إلى ${backLabel}` : 'العودة لقائمة المحادثات'}
-                    }
-                    className="min-h-[40px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#1A1A22] hover:bg-[#24242F] border border-[#2C2C35] text-xs font-bold text-[#F5F2EB] inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
-                  >
+                                      <button
+                      type="button"
+                      onClick={onBack || (() => onSelectConversation(null))}
+                      aria-label={backLabel ? 'عودة إلى ' + backLabel : 'العودة إلى المحادثات'}
+                      title={backLabel ? 'عودة إلى ' + backLabel : 'العودة إلى المحادثات'}
+                      className="min-h-[40px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#1A1A22] hover:bg-[#24242F] border border-[#2A2A36] text-xs font-bold text-[#F5F2EB] inline-flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
                     <ArrowRight className="w-4 h-4 text-[#D4A853] shrink-0" />
                     <span className="hidden sm:inline shrink-0">رجوع</span>
                     {backLabel && (
