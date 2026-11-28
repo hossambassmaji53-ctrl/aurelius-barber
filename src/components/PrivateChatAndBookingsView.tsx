@@ -1925,7 +1925,7 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                   );
                 }
                               return (
-                <div className="shrink-0 border-t border-[#22222B] bg-[#121218]">
+                                <div className="shrink-0 border-t border-[#22222B] bg-[#121218]">
                   {dmError && (
                     <div className="px-4 sm:px-6 py-2 border-b border-red-500/30 bg-red-500/10 flex items-center justify-between gap-2 text-xs text-red-200">
                       <span>{dmError}</span>
@@ -1938,21 +1938,19 @@ export const PrivateChatAndBookingsView: React.FC<PrivateChatAndBookingsViewProp
                       </button>
                     </div>
                   )}
+                  {isOtherTypingNow && (
+                    <div className="px-4 sm:px-6 py-1.5 border-b border-[#1E1E26] bg-[#13131B] flex items-center gap-2 text-xs text-[#A6A39B]">
+                      <span className="inline-flex items-center gap-1" aria-hidden="true">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce [animation-delay:150ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce [animation-delay:300ms]" />
+                      </span>
+                      <span className="font-semibold truncate">
+                        {otherName} يكتب الآن...
+                      </span>
+                    </div>
+                  )}
 
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce [animation-delay:150ms]" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#D4A853] animate-bounce [animation-delay:300ms]" />
-                        </span>
-                        <span className="font-semibold truncate">
-                          {otherName} يكتب الآن...
-                        </span>
-                      </div>
-                    )}
-                    <form
-                      onSubmit={handleSendPrivateMessage}
-                      className="px-3 sm:px-6 py-2.5 flex items-center gap-2.5"
-                    >
-                      <input
                         type="text"
                         maxLength={1000}
                         value={msgText}
